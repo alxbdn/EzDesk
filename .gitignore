@@ -1,0 +1,5 @@
+# Downloaded or generated at install time
+*.dll
+*.exe
+icons/
+*.ico
