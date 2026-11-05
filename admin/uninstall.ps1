@@ -1,6 +1,6 @@
-# Removes Desktop Switcher: stops it, deletes the startup task and the install folder.
-# Usage:  powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
-# AutoHotkey itself is left installed (winget uninstall --id AutoHotkey.AutoHotkey to remove it).
+# Removes admin mode: stops it, deletes the startup task and the Program Files folder.
+# Usage:  powershell -ExecutionPolicy Bypass -File .\uninstall.ps1   (or double-click "Uninstall admin mode.cmd")
+# Simple mode needs no uninstaller: untick "Start with Windows" in the tray menu, Exit, delete the folder.
 param([string]$InstallDir = "$env:ProgramFiles\DesktopSwitcher")
 $ErrorActionPreference = 'Stop'
 
@@ -16,6 +16,6 @@ if ($task) {
     Stop-ScheduledTask -TaskName 'Desktop Switcher'
     Unregister-ScheduledTask -TaskName 'Desktop Switcher' -Confirm:$false
 }
-Get-Process AutoHotkey64 -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$InstallDir\*" } | Stop-Process -Force
+Get-Process DesktopSwitcher, AutoHotkey64 -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$InstallDir\*" } | Stop-Process -Force
 Start-Sleep -Milliseconds 800
 if (Test-Path $InstallDir) { Remove-Item $InstallDir -Recurse -Force }

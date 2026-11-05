@@ -1,0 +1,51 @@
+name: Build release zip
+
+# Pull requests: build and check the zip (downloadable as an artifact).
+# Tags v*: same, then publish it as a GitHub Release.
+on:
+  pull_request:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build zip
+        shell: powershell
+        run: |
+          $v = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { "dev-$($env:GITHUB_SHA.Substring(0, 7))" }
+          .\build-release.ps1 -Version $v
+
+      - name: Check zip
+        shell: powershell
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $z = [IO.Compression.ZipFile]::OpenRead("dist\DesktopSwitcher.zip"); $names = $z.Entries.FullName; $z.Dispose()
+          $required = 'DesktopSwitcher.exe', 'DesktopSwitcher.ahk', 'VirtualDesktopAccessor.dll', 'icons/1.ico', 'icons/more.ico',
+                      'README.txt', 'LICENSE.txt', 'LICENSE-AutoHotkey.txt', 'admin/install.ps1', 'admin/Install admin mode.cmd'
+          foreach ($n in $required) { if ($names -notcontains "DesktopSwitcher/$n") { throw "zip is missing $n" } }
+          if ($names -like '*\*') { throw 'zip entries must use / separators' }
+          $out = & dist\DesktopSwitcher\DesktopSwitcher.exe /ErrorStdOut /validate dist\DesktopSwitcher\DesktopSwitcher.ahk 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0) { throw "DesktopSwitcher.ahk failed validation: $out" }
+          Get-Content dist\DesktopSwitcher.zip.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DesktopSwitcher
+          path: dist/DesktopSwitcher.zip
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME dist\DesktopSwitcher.zip dist\DesktopSwitcher.zip.sha256 `
+            --title "Desktop Switcher $env:GITHUB_REF_NAME" --notes-file .github\release-notes.md

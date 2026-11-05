@@ -108,10 +108,51 @@ UpdateTray(*) {
     A_IconTip := "Desktop " n " of " c (name != "" ? " — " name : "")
 }
 
-A_TrayMenu.Insert("1&", "Task View", (*) => Send("#{Tab}"))
-A_TrayMenu.Insert("2&")
+; ---------------------------------------------------------------------
+;  Tray menu and "Start with Windows"
+; ---------------------------------------------------------------------
+; Simple mode: a shortcut in the user's Startup folder (no admin needed).
+; Admin mode (install.ps1): a scheduled task starts it, so the toggle is shown but locked.
+global STARTUP_LNK := A_Startup "\Desktop Switcher.lnk"
+STARTED_AT_LOGIN := A_Args.Length && A_Args[1] = "--startup"
+
+IsStartupOn() => FileExist(STARTUP_LNK) != ""
+
+SetStartup(on) {
+    if on                                           ; (re)written each launch, so it follows the folder if it moves
+        FileCreateShortcut(A_AhkPath, STARTUP_LNK, A_ScriptDir, '"' A_ScriptFullPath '" --startup', "Desktop Switcher", A_ScriptDir "\icons\1.ico")
+    else if IsStartupOn()
+        FileDelete(STARTUP_LNK)
+}
+
+ToggleStartup(itemName, *) {
+    SetStartup(!IsStartupOn())
+    IsStartupOn() ? A_TrayMenu.Check(itemName) : A_TrayMenu.Uncheck(itemName)
+}
+
+A_TrayMenu.Delete()
+A_TrayMenu.Add("Task View", (*) => Send("#{Tab}"))
+A_TrayMenu.Add()
+if A_IsAdmin {
+    A_TrayMenu.Add("Starts with Windows (admin mode)", (*) => 0)
+    A_TrayMenu.Check("Starts with Windows (admin mode)")
+    A_TrayMenu.Disable("Starts with Windows (admin mode)")
+} else {
+    A_TrayMenu.Add("Start with Windows", ToggleStartup)
+    if IsStartupOn() {
+        SetStartup(true)
+        A_TrayMenu.Check("Start with Windows")
+    }
+}
+A_TrayMenu.Add("Help", (*) => Run("https://github.com/alxbdn/win11-desktop-switcher#readme"))
+A_TrayMenu.Add()
+A_TrayMenu.Add("Restart", (*) => Reload())
+A_TrayMenu.Add("Exit", (*) => ExitApp())
 A_TrayMenu.Default := "Task View"
 A_TrayMenu.ClickCount := 1                          ; single left-click opens Task View
+
+if !STARTED_AT_LOGIN
+    TrayTip("Alt + 1…9 switches desktops.`nNo numbered icon near the clock? Click ^ and drag it onto the taskbar.", "Desktop Switcher is running", "Mute")
 
 MSG_DESKTOP_CHANGED := 0x1400 + 30
 DllCall(pHook, "Ptr", A_ScriptHwnd, "Int", MSG_DESKTOP_CHANGED, "Int")
