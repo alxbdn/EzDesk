@@ -1,4 +1,4 @@
-https://github.com/user-attachments/assets/3f30b27d-8ac1-476c-b2e6-5dcabe5aa908
+https://github.com/user-attachments/assets/845147b0-0df2-421d-85b2-2343a13c4046
 
 # win11-desktop-switcher
 
@@ -25,7 +25,13 @@ Keep the folder where you extracted it: "Start with Windows" points to it. If yo
 |---|---|
 | `Alt + 1…9` | Go to desktop N. If it doesn't exist yet, creates **one** new desktop and goes there (with 2 desktops, `Alt + 4` creates desktop 3) |
 | `Alt + Shift + 1…9` | Move the active window to desktop N and follow it, creating the new desktop the same way if needed |
-| Scroll on the taskbar | Previous / next desktop |
+| Scroll on the 
+
+https://github.com/user-attachments/assets/49fcb27b-0a43-4b74-a364-c29653e6bf3f
+
+
+
+taskbar | Previous / next desktop |
 | Scroll on the tray (volume, clock…) | Normal Windows behavior, volume still works |
 | Click the tray icon | Task View |
 | Right-click the tray icon | Start with Windows, Help, Restart, Exit |
