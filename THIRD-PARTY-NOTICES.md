@@ -6,9 +6,9 @@ The release zip bundles two third-party components, unmodified.
 
 `DesktopSwitcher.exe` is `AutoHotkey64.exe` from [AutoHotkey v2.0.31](https://github.com/AutoHotkey/AutoHotkey/releases/tag/v2.0.31), renamed so that it runs `DesktopSwitcher.ahk` when double-clicked. It's licensed under the GNU General Public License v2: see `LICENSE-AutoHotkey.txt` in the zip. Source code: https://github.com/AutoHotkey/AutoHotkey
 
-## VirtualDesktopAccessor (`VirtualDesktopAccessor.dll`)
+## VirtualDesktopAccessor (`VirtualDesktopAccessor.dll`, `VirtualDesktopAccessor-win10.dll`)
 
-From [Ciantic/VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor), release `2024-12-16-windows11`.
+From [Ciantic/VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor): release `2024-12-16-windows11` for Windows 11, and release `2019-windows10`, renamed `VirtualDesktopAccessor-win10.dll`, for Windows 10. Same author and license.
 
 ```
 MIT License

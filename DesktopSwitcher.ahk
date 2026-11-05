@@ -9,18 +9,31 @@ Persistent
 ;    Scroll on taskbar  previous / next desktop
 ;    Tray icon          shows the current desktop number; click = Task View
 ; =====================================================================
+;
+; Start-up order matters: icon, menu and hotkeys are set up first, and the
+; virtual-desktop DLL is only called afterwards, from a timer. If Windows'
+; virtual desktops aren't reachable yet (login, Explorer restart) the app
+; still shows its own icon, its menu still works and Exit still exits.
 
-global VDA  := A_ScriptDir "\VirtualDesktopAccessor.dll"
+; Our icon right away, never AutoHotkey's green "H".
+TraySetIcon(A_ScriptDir "\icons\1.ico")
+A_IconTip := "Desktop Switcher (starting…)"
+
+; ---------------------------------------------------------------------
+;  VirtualDesktopAccessor: Windows 11 and Windows 10 need different builds
+; ---------------------------------------------------------------------
+global WIN_BUILD := Integer(StrSplit(A_OSVersion, ".")[3])
+global VDA  := A_ScriptDir (WIN_BUILD >= 22000 ? "\VirtualDesktopAccessor.dll" : "\VirtualDesktopAccessor-win10.dll")
 global hVDA := DllCall("LoadLibrary", "Str", VDA, "Ptr")
 if !hVDA {
     MsgBox("Could not load " VDA, "Desktop Switcher", "Iconx")
     ExitApp(1)
 }
 
-Proc(name) {
+Proc(name, required := true) {
     p := DllCall("GetProcAddress", "Ptr", hVDA, "AStr", name, "Ptr")
-    if !p {
-        MsgBox("VirtualDesktopAccessor.dll has no " name "().`nIt may not match this Windows build.", "Desktop Switcher", "Iconx")
+    if (!p && required) {
+        MsgBox("VirtualDesktopAccessor.dll has no " name "().`nIt may not match this Windows build (" WIN_BUILD ").", "Desktop Switcher", "Iconx")
         ExitApp(1)
     }
     return p
@@ -30,24 +43,46 @@ global pCount   := Proc("GetDesktopCount")
 global pCurrent := Proc("GetCurrentDesktopNumber")
 global pGoTo    := Proc("GoToDesktopNumber")
 global pMove    := Proc("MoveWindowToDesktopNumber")
-global pCreate  := Proc("CreateDesktop")
-global pName    := Proc("GetDesktopName")
+global pOnCur   := Proc("IsWindowOnCurrentVirtualDesktop")
 global pHook    := Proc("RegisterPostMessageHook")
-global pUnhook  := Proc("UnregisterPostMessageHook")
+global pName    := Proc("GetDesktopName", false)    ; Windows 11 build only
+
+; Every call into the DLL goes through VdaCall(). A DLL that doesn't match this Windows build crashes
+; (access violation 0xC0000005) instead of returning an error. Without this, AutoHotkey shows an
+; error dialog every second and the app looks frozen. Three crashes and we stop calling it at all.
+global vdaErrors := 0, vdaBroken := false
+
+VdaCall(p, args*) {
+    global vdaErrors, vdaBroken
+    if vdaBroken
+        return -1
+    try return DllCall(p, args*)
+    catch {
+        vdaErrors += 1
+        if (vdaErrors >= 3 && !vdaBroken) {
+            vdaBroken := true
+            A_IconTip := "Desktop Switcher: not compatible with this Windows (build " WIN_BUILD ")"
+            TrayTip("The virtual-desktop library doesn't work on this Windows version (build " WIN_BUILD ").`nShortcuts are disabled. See Help in this icon's menu.", "Desktop Switcher", "Iconx Mute")
+        }
+        return -1
+    }
+}
 
 ; The DLL counts desktops from 0; everything the user sees counts from 1.
-DesktopCount()   => DllCall(pCount, "Int")
-CurrentDesktop() => DllCall(pCurrent, "Int")
-CreateDesktop()  => DllCall(pCreate, "Int")        ; returns the new desktop's 0-based index
+DesktopCount()   => VdaCall(pCount, "Int")
+CurrentDesktop() => VdaCall(pCurrent, "Int")
 
 DesktopName(i) {
+    if !pName
+        return ""
     buf := Buffer(1024, 0)
-    DllCall(pName, "Int", i, "Ptr", buf, "UPtr", buf.Size, "Int")
+    if (VdaCall(pName, "Int", i, "Ptr", buf, "UPtr", buf.Size, "Int") = -1 && vdaBroken)
+        return ""
     return StrGet(buf, "UTF-8")                     ; "" when the desktop has no custom name
 }
 
 ; ---------------------------------------------------------------------
-;  Which desktop does "N" mean?
+;  Switching
 ; ---------------------------------------------------------------------
 ; Returns the 0-based desktop to use when you press Alt+N (n = 1…9),
 ; or -1 to do nothing. Used by both "go to" and "move window to".
@@ -58,10 +93,43 @@ ResolveTarget(n) {
     return -1                                       ; desktop n doesn't exist: do nothing (no surprise empty desktops)
 }
 
+; Switches desktop without making taskbar buttons flash.
+; When the active window vanishes with its desktop, Windows tries to activate a window on the
+; new one; that request doesn't come from the user, so it's refused and the button flashes
+; instead ("wants attention"). Parking focus on the taskbar first, then focusing the top window
+; of the new desktop ourselves, avoids it.
+SwitchTo(i, focus := true) {
+    try WinActivate("ahk_class Shell_TrayWnd")
+    VdaCall(pGoTo, "Int", i, "Int")
+    if focus
+        FocusTopWindow()
+}
+
+FocusTopWindow() {
+    for hwnd in WinGetList() {                      ; top-most first
+        if IsRealWindow(hwnd) && VdaCall(pOnCur, "Ptr", hwnd, "Int") = 1 {
+            try WinActivate(hwnd)
+            return
+        }
+    }
+}
+
+IsRealWindow(hwnd) {
+    try {
+        style := WinGetStyle(hwnd), ex := WinGetExStyle(hwnd), cls := WinGetClass(hwnd)
+        if !(style & 0x10000000) || (style & 0x20000000) || (ex & 0x80)      ; hidden, minimized, tool window
+            return false
+        if (cls = "Shell_TrayWnd" || cls = "Shell_SecondaryTrayWnd" || cls = "Progman" || cls = "WorkerW")
+            return false
+        return WinGetTitle(hwnd) != ""
+    }
+    return false
+}
+
 GoToDesktop(n) {
     i := ResolveTarget(n)
     if (i >= 0 && i != CurrentDesktop())
-        DllCall(pGoTo, "Int", i, "Int")
+        SwitchTo(i)
 }
 
 MoveActiveToDesktop(n) {
@@ -74,9 +142,9 @@ MoveActiveToDesktop(n) {
     i := ResolveTarget(n)
     if (i < 0)
         return
-    DllCall(pMove, "Ptr", hwnd, "Int", i, "Int")
-    DllCall(pGoTo, "Int", i, "Int")
-    WinActivate(hwnd)
+    VdaCall(pMove, "Ptr", hwnd, "Int", i, "Int")
+    SwitchTo(i, false)
+    try WinActivate(hwnd)                           ; follow the moved window
 }
 
 Step(delta) {
@@ -86,26 +154,7 @@ Step(delta) {
     last := A_TickCount
     i := CurrentDesktop() + delta
     if (i >= 0 && i < DesktopCount())
-        DllCall(pGoTo, "Int", i, "Int")
-}
-
-; ---------------------------------------------------------------------
-;  Tray indicator
-; ---------------------------------------------------------------------
-global shownIndex := -2, shownCount := -2
-
-UpdateTray(*) {
-    global shownIndex, shownCount
-    i := CurrentDesktop(), c := DesktopCount()
-    if (i < 0 || c <= 0)                            ; Explorer not ready (login, restart): try again next tick
-        return
-    if (i = shownIndex && c = shownCount)
-        return
-    shownIndex := i, shownCount := c
-    n := i + 1
-    TraySetIcon(A_ScriptDir "\icons\" (n <= 9 ? n : "more") ".ico")
-    name := DesktopName(i)
-    A_IconTip := "Desktop " n " of " c (name != "" ? " — " name : "")
+        SwitchTo(i)
 }
 
 ; ---------------------------------------------------------------------
@@ -151,18 +200,8 @@ A_TrayMenu.Add("Exit", (*) => ExitApp())
 A_TrayMenu.Default := "Task View"
 A_TrayMenu.ClickCount := 1                          ; single left-click opens Task View
 
-if !STARTED_AT_LOGIN
-    TrayTip("Alt + 1…9 switches desktops.`nNo numbered icon near the clock? Click ^ and drag it onto the taskbar.", "Desktop Switcher is running", "Mute")
-
-MSG_DESKTOP_CHANGED := 0x1400 + 30
-DllCall(pHook, "Ptr", A_ScriptHwnd, "Int", MSG_DESKTOP_CHANGED, "Int")
-OnMessage(MSG_DESKTOP_CHANGED, UpdateTray)          ; instant update on every switch
-SetTimer(UpdateTray, 1000)                          ; safety net: added/removed desktops, Explorer restarts
-OnExit((*) => DllCall(pUnhook, "Ptr", A_ScriptHwnd, "Int"))
-UpdateTray()
-
 ; ---------------------------------------------------------------------
-;  Hotkeys
+;  Hotkeys (registered before any call into the DLL)
 ; ---------------------------------------------------------------------
 MakeGo(n) {
     return (*) => GoToDesktop(n)
@@ -201,3 +240,47 @@ OverTrayArea(taskbar, x, y) {
 WheelUp::Step(-1)
 WheelDown::Step(1)
 #HotIf
+
+; ---------------------------------------------------------------------
+;  Tray indicator: connects to the DLL from a timer, retrying with back-off
+; ---------------------------------------------------------------------
+global shownIndex := -2, shownCount := -2
+global connected := false, failures := 0, warned := false
+global MSG_DESKTOP_CHANGED := 0x1400 + 30
+
+UpdateTray(*) {
+    global shownIndex, shownCount, connected, failures, warned
+    i := CurrentDesktop(), c := DesktopCount()
+    if vdaBroken {                                  ; incompatible DLL: stop polling, the menu keeps working
+        SetTimer(UpdateTray, 0)
+        return
+    }
+    if (i < 0 || c <= 0) {                          ; virtual desktops not reachable (yet)
+        failures += 1
+        A_IconTip := "Desktop Switcher: waiting for Windows virtual desktops…"
+        SetTimer(UpdateTray, Min(1000 * 2 ** Min(failures, 4), 10000))   ; back off: 2 s … 10 s
+        if (failures = 6 && !warned) {
+            warned := true
+            TrayTip("Can't reach Windows' virtual desktops (Windows build " WIN_BUILD ").`nTry Restart from this icon's menu.", "Desktop Switcher", "Iconx Mute")
+        }
+        return
+    }
+    if !connected {                                 ; first success: listen for switches, poll as a safety net
+        connected := true, failures := 0
+        VdaCall(pHook, "Ptr", A_ScriptHwnd, "Int", MSG_DESKTOP_CHANGED, "Int")
+        OnMessage(MSG_DESKTOP_CHANGED, UpdateTray)
+        SetTimer(UpdateTray, 1000)
+    }
+    if (i = shownIndex && c = shownCount)
+        return
+    shownIndex := i, shownCount := c
+    n := i + 1
+    TraySetIcon(A_ScriptDir "\icons\" (n <= 9 ? n : "more") ".ico")
+    name := DesktopName(i)
+    A_IconTip := "Desktop " n " of " c (name != "" ? " — " name : "")
+}
+
+if !STARTED_AT_LOGIN
+    TrayTip("Alt + 1…9 switches desktops.`nNo numbered icon near the clock? Click ^ and drag it onto the taskbar.", "Desktop Switcher is running", "Mute")
+
+SetTimer(UpdateTray, -100)                          ; first contact with the DLL happens after start-up is complete

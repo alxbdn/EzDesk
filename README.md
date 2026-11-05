@@ -2,7 +2,7 @@ https://github.com/user-attachments/assets/3f30b27d-8ac1-476c-b2e6-5dcabe5aa908
 
 # win11-desktop-switcher
 
-Fast virtual-desktop switching for Windows 11, with a tray icon that shows which desktop you're on. Built on [AutoHotkey v2](https://www.autohotkey.com) and [VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor).
+Fast virtual-desktop switching for Windows 11, with a tray icon that shows which desktop you're on. It also runs on Windows 10. Built on [AutoHotkey v2](https://www.autohotkey.com) and [VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor).
 
 ![Tray icons](docs/icons.png)
 
@@ -58,6 +58,7 @@ It downloads pinned versions of AutoHotkey and VirtualDesktopAccessor, checks th
 ## Troubleshooting
 
 - **"DLL may not match this Windows build" after a Windows update:** VirtualDesktopAccessor relies on undocumented Windows internals that sometimes change between builds. Check its [releases](https://github.com/Ciantic/VirtualDesktopAccessor/releases) for a newer DLL. Update the URL and SHA256 in `build-release.ps1` and `admin\install.ps1`.
+- **Tooltip says "waiting for Windows virtual desktops":** Windows isn't answering yet, which is normal for a few seconds after login. If it stays that way, use **Restart** from the icon's menu. Before v1.0.1, this showed as a green "H" icon that couldn't be closed.
 - **Can't find it after double-clicking:** it's running, but Windows put the icon under the `^` arrow next to the clock. Drag it onto the taskbar. Double-clicking the exe again just restarts it.
 
 Tested on Windows 11 26H2 (build 26300).
