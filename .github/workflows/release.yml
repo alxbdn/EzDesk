@@ -41,6 +41,19 @@ jobs:
           name: DesktopSwitcher
           path: dist/DesktopSwitcher.zip
 
+      # Microsoft Store package. Unsigned on purpose: the Store signs it on submission,
+      # so it's an artifact to upload to Partner Center, not a release download.
+      - name: Build Store package (MSIX)
+        shell: powershell
+        run: |
+          $v = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.0.1' }
+          .\store\build-msix.ps1 -Version $v
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DesktopSwitcher-store-msix
+          path: dist/DesktopSwitcher.msix
+
       - name: Publish release
         if: github.ref_type == 'tag'
         shell: powershell
