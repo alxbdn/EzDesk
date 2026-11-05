@@ -49,8 +49,8 @@ Partner Center asks you to justify it. Paste:
 
 > Windows has virtual desktops, but no shortcut to jump straight to a given desktop, and no way to see which one you're on. Desktop Switcher adds both.
 >
-> • Alt + 1…9: go straight to desktop N
-> • Alt + Shift + 1…9: send the active window to desktop N and follow it
+> • Alt + 1…9: go straight to desktop N, or create it if it doesn't exist yet
+> • Alt + Shift + 1…9: send the active window to desktop N (a new one if needed) and follow it
 > • Scroll on the taskbar: previous / next desktop. Scrolling over the volume icon still changes the volume.
 > • A tray icon shows the current desktop's number. Click it for Task View.
 >
@@ -62,8 +62,8 @@ Partner Center asks you to justify it. Paste:
 
 **Features** (one per line in Partner Center)
 
-> Alt + 1…9 to jump to any virtual desktop
-> Alt + Shift + 1…9 to move the active window to another desktop
+> Alt + 1…9 to jump to any virtual desktop, or create a new one
+> Alt + Shift + 1…9 to move the active window to another desktop, even a new one
 > Scroll on the taskbar to step through desktops
 > Tray icon with the current desktop number
 > Starts with Windows (can be turned off in Settings › Apps › Startup)

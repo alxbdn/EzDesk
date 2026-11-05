@@ -23,8 +23,8 @@ Keep the folder where you extracted it: "Start with Windows" points to it. If yo
 
 | Action | Effect |
 |---|---|
-| `Alt + 1…9` | Go to desktop N (does nothing if it doesn't exist) |
-| `Alt + Shift + 1…9` | Move the active window to desktop N and follow it |
+| `Alt + 1…9` | Go to desktop N. If it doesn't exist yet, creates **one** new desktop and goes there (with 2 desktops, `Alt + 4` creates desktop 3) |
+| `Alt + Shift + 1…9` | Move the active window to desktop N and follow it, creating the new desktop the same way if needed |
 | Scroll on the taskbar | Previous / next desktop |
 | Scroll on the tray (volume, clock…) | Normal Windows behavior, volume still works |
 | Click the tray icon | Task View |

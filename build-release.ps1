@@ -69,8 +69,8 @@ START
   2. Right-click the icon > "Start with Windows" so it starts by itself.
 
 SHORTCUTS
-  Alt + 1...9           go to desktop N
-  Alt + Shift + 1...9   move the active window to desktop N
+  Alt + 1...9           go to desktop N (creates the next desktop if N does not exist yet)
+  Alt + Shift + 1...9   move the active window to desktop N (creates it the same way if needed)
   Scroll on taskbar     previous / next desktop
   Click the icon        Task View
 

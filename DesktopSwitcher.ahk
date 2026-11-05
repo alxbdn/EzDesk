@@ -46,6 +46,7 @@ global pMove    := Proc("MoveWindowToDesktopNumber")
 global pOnCur   := Proc("IsWindowOnCurrentVirtualDesktop")
 global pHook    := Proc("RegisterPostMessageHook")
 global pName    := Proc("GetDesktopName", false)    ; Windows 11 build only
+global pCreate  := Proc("CreateDesktop", false)     ; Windows 11 build only (Windows 10: Ctrl+Win+D)
 
 ; Every call into the DLL goes through VdaCall(). A DLL that doesn't match this Windows build crashes
 ; (access violation 0xC0000005) instead of returning an error. Without this, AutoHotkey shows an
@@ -84,13 +85,32 @@ DesktopName(i) {
 ; ---------------------------------------------------------------------
 ;  Switching
 ; ---------------------------------------------------------------------
-; Returns the 0-based desktop to use when you press Alt+N (n = 1…9),
-; or -1 to do nothing. Used by both "go to" and "move window to".
+; Returns the 0-based desktop to use when you press Alt+N (n = 1…9), or -1 to do nothing.
+; Used by both "go to" and "move window to". If desktop n doesn't exist yet, ONE new desktop is
+; created at the end, whatever n is: with 2 desktops, Alt+4 creates desktop 3, not 3 and 4.
 ResolveTarget(n) {
     count := DesktopCount()
+    if (count <= 0)
+        return -1
     if (n <= count)
         return n - 1
-    return -1                                       ; desktop n doesn't exist: do nothing (no surprise empty desktops)
+    return NewDesktop(count)
+}
+
+; Creates one desktop at the end; returns its 0-based index, or -1 if it didn't appear.
+; Success is read from the desktop count, not from the call's return value.
+NewDesktop(count) {
+    if pCreate
+        VdaCall(pCreate, "Int")
+    else
+        Send("^#d")                                 ; Windows 10 DLL can't create desktops: Windows' own shortcut does (and switches to it)
+    deadline := A_TickCount + 1500
+    while (A_TickCount < deadline) {
+        if (DesktopCount() > count)
+            return count
+        Sleep(50)
+    }
+    return -1
 }
 
 ; Switches desktop without making taskbar buttons flash.
