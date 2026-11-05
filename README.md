@@ -1,13 +1,23 @@
 
 https://github.com/user-attachments/assets/267437c0-4b8f-4ea9-a9be-71ae77f3ffa2
 
+**[Get it from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)** · or [download the zip](https://github.com/alxbdn/win11-desktop-switcher/releases/latest/download/DesktopSwitcher.zip)
+
 # win11-desktop-switcher
 
 Fast virtual-desktop switching for Windows 11, with a tray icon that shows which desktop you're on. It also runs on Windows 10. Built on [AutoHotkey v2](https://www.autohotkey.com) and [VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor).
 
 ![Tray icons](docs/icons.png)
 
-## Install (2 minutes, no admin, no console)
+## Install
+
+### From the Microsoft Store (recommended)
+
+**[Get Desktop Switcher from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)**, click **Get**, then **Open**. It's signed by Microsoft, so there's no warning, and it updates itself.
+
+It starts with Windows; you can turn that off in **Settings › Apps › Startup**. No numbered icon near the clock? Click the **^** arrow next to it and drag the icon onto the taskbar.
+
+### From the zip (no Store, no admin, no console)
 
 1. **[Download DesktopSwitcher.zip](https://github.com/alxbdn/win11-desktop-switcher/releases/latest/download/DesktopSwitcher.zip)**
 2. Right-click the zip → **Properties** → tick **Unblock** → **OK**
@@ -41,7 +51,10 @@ Shortcuts use the physical keys of the number row, so they work on any keyboard 
 
 ## Uninstall
 
-Right-click the tray icon → untick **Start with Windows** → **Exit**, then delete the folder.
+- **Store version:** Settings › Apps › Installed apps → Desktop Switcher → **Uninstall**.
+- **Zip version:** right-click the tray icon → untick **Start with Windows** → **Exit**, then delete the folder.
+
+Don't keep both installed: they'd both react to the same shortcuts.
 
 ## Power users: admin mode
 
