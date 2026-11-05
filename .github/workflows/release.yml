@@ -28,7 +28,7 @@ jobs:
         run: |
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $z = [IO.Compression.ZipFile]::OpenRead("dist\DesktopSwitcher.zip"); $names = $z.Entries.FullName; $z.Dispose()
-          $required = 'DesktopSwitcher.exe', 'DesktopSwitcher.ahk', 'VirtualDesktopAccessor.dll', 'icons/1.ico', 'icons/more.ico',
+          $required = 'DesktopSwitcher.exe', 'DesktopSwitcher.ahk', 'VirtualDesktopAccessor.dll', 'VirtualDesktopAccessor-win10.dll', 'icons/1.ico', 'icons/more.ico',
                       'README.txt', 'LICENSE.txt', 'LICENSE-AutoHotkey.txt', 'admin/install.ps1', 'admin/Install admin mode.cmd'
           foreach ($n in $required) { if ($names -notcontains "DesktopSwitcher/$n") { throw "zip is missing $n" } }
           if ($names -like '*\*') { throw 'zip entries must use / separators' }

@@ -11,8 +11,15 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 
-$DllUrl    = 'https://github.com/Ciantic/VirtualDesktopAccessor/releases/download/2024-12-16-windows11/VirtualDesktopAccessor.dll'
-$DllSha256 = '8740C572A1C000E3B87FFEB1E4C397EAE9AF3BD4A2ABDC3BCFFACAB4493F8FF5'
+# VirtualDesktopAccessor ships separate builds for Windows 11 and Windows 10; the script loads the right one.
+$Dlls = @(
+    @{ Name = 'VirtualDesktopAccessor.dll'
+       Url  = 'https://github.com/Ciantic/VirtualDesktopAccessor/releases/download/2024-12-16-windows11/VirtualDesktopAccessor.dll'
+       Sha  = '8740C572A1C000E3B87FFEB1E4C397EAE9AF3BD4A2ABDC3BCFFACAB4493F8FF5' },
+    @{ Name = 'VirtualDesktopAccessor-win10.dll'
+       Url  = 'https://github.com/Ciantic/VirtualDesktopAccessor/releases/download/2019-windows10/VirtualDesktopAccessor.dll'
+       Sha  = '145431BC2090281838DE31824BC829DD35688B13488F4850F4BC5F25F5E599DA' }
+)
 $TaskName  = 'Desktop Switcher'
 
 # --- Re-launch elevated if needed; show the elevated run's output here when it finishes ----------
@@ -70,18 +77,21 @@ try {
     if ($exe -ne "$InstallDir\DesktopSwitcher.exe") { Copy-Item $exe "$InstallDir\DesktopSwitcher.exe" -Force }
     Remove-Item "$InstallDir\AutoHotkey64.exe", "$InstallDir\install-startup.ps1" -ErrorAction SilentlyContinue   # older layouts
 
-    $dll = "$InstallDir\VirtualDesktopAccessor.dll"
-    if ((Test-Path "$src\VirtualDesktopAccessor.dll") -and (Get-FileHash "$src\VirtualDesktopAccessor.dll").Hash -eq $DllSha256) {
-        Copy-Item "$src\VirtualDesktopAccessor.dll" $dll -Force
-    } elseif (-not (Test-Path $dll) -or (Get-FileHash $dll).Hash -ne $DllSha256) {
-        Say 'Downloading VirtualDesktopAccessor.dll...'
-        $tmp = Join-Path $env:TEMP 'VirtualDesktopAccessor.dll.download'
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -UseBasicParsing $DllUrl -OutFile $tmp
-        if ((Get-FileHash $tmp).Hash -ne $DllSha256) { Remove-Item $tmp; throw 'Downloaded DLL does not match the expected SHA256. Not installing it.' }
-        Move-Item $tmp $dll -Force
+    foreach ($d in $Dlls) {
+        $dll = Join-Path $InstallDir $d.Name; $bundled = Join-Path $src $d.Name
+        if ((Test-Path $bundled) -and (Get-FileHash $bundled).Hash -eq $d.Sha) {
+            Copy-Item $bundled $dll -Force
+        } elseif (-not (Test-Path $dll) -or (Get-FileHash $dll).Hash -ne $d.Sha) {
+            Say "Downloading $($d.Name)..."
+            $tmp = Join-Path $env:TEMP "$($d.Name).download"
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            Invoke-WebRequest -UseBasicParsing $d.Url -OutFile $tmp
+            if ((Get-FileHash $tmp).Hash -ne $d.Sha) { Remove-Item $tmp; throw "Downloaded $($d.Name) does not match the expected SHA256. Not installing it." }
+            Move-Item $tmp $dll -Force
+        }
     }
-    Say 'DLL: verified'
+    Remove-Item "$InstallDir\make-icons.ps1", "$InstallDir\README.md" -ErrorAction SilentlyContinue   # leftovers of the first, manual install
+    Say 'DLLs: verified (Windows 11 + Windows 10)'
 
     if (Test-Path "$src\icons\1.ico") { Copy-Item "$src\icons\*.ico" "$InstallDir\icons" -Force }
     else { & "$src\make-icons.ps1" -OutDir "$InstallDir\icons" -Outline $Outline | Out-Null }

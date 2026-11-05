@@ -3,7 +3,7 @@
 # Usage:  powershell -ExecutionPolicy Bypass -File .\build-release.ps1 -Version 1.0.0 [-AhkExe <path> -AhkLicense <path>] [-Dll <path>]
 param(
     [Parameter(Mandatory)] [string]$Version,
-    [string]$AhkExe, [string]$AhkLicense, [string]$Dll,
+    [string]$AhkExe, [string]$AhkLicense, [string]$Dll, [string]$Dll10,
     [string]$OutDir
 )
 $ErrorActionPreference = 'Stop'
@@ -14,6 +14,8 @@ $AhkZipUrl    = 'https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0
 $AhkZipSha256 = 'CA1A595ACA4528755D8D4CD7FED23D497A37BD9A0B6892072612D68DEE1BD00A'
 $DllUrl       = 'https://github.com/Ciantic/VirtualDesktopAccessor/releases/download/2024-12-16-windows11/VirtualDesktopAccessor.dll'
 $DllSha256    = '8740C572A1C000E3B87FFEB1E4C397EAE9AF3BD4A2ABDC3BCFFACAB4493F8FF5'
+$Dll10Url     = 'https://github.com/Ciantic/VirtualDesktopAccessor/releases/download/2019-windows10/VirtualDesktopAccessor.dll'
+$Dll10Sha256  = '145431BC2090281838DE31824BC829DD35688B13488F4850F4BC5F25F5E599DA'
 
 function Get-Verified($url, $sha, $dest) {
     Invoke-WebRequest -UseBasicParsing $url -OutFile $dest
@@ -45,6 +47,10 @@ try {
         if ((Get-FileHash $Dll).Hash -ne $DllSha256) { throw "Local DLL $Dll does not match the pinned SHA256" }
         Copy-Item $Dll "$stage\VirtualDesktopAccessor.dll"
     } else { Get-Verified $DllUrl $DllSha256 "$stage\VirtualDesktopAccessor.dll" }
+    if ($Dll10) {
+        if ((Get-FileHash $Dll10).Hash -ne $Dll10Sha256) { throw "Local DLL $Dll10 does not match the pinned SHA256" }
+        Copy-Item $Dll10 "$stage\VirtualDesktopAccessor-win10.dll"
+    } else { Get-Verified $Dll10Url $Dll10Sha256 "$stage\VirtualDesktopAccessor-win10.dll" }   # Windows 10 build
 
     # --- App files ---------------------------------------------------------------------------------
     Copy-Item "$root\DesktopSwitcher.ahk" $stage
