@@ -1,3 +1,5 @@
+https://github.com/user-attachments/assets/3f30b27d-8ac1-476c-b2e6-5dcabe5aa908
+
 # win11-desktop-switcher
 
 Fast virtual-desktop switching for Windows 11, with a tray icon that shows which desktop you're on. Built on [AutoHotkey v2](https://www.autohotkey.com) and [VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor).
