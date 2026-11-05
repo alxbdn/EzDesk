@@ -209,9 +209,13 @@ MakeGo(n) {
 MakeMove(n) {
     return (*) => MoveActiveToDesktop(n)
 }
+; Bound by physical key (scan codes sc002…sc00A = the 1…9 row), not by character.
+; "!1" means "Alt + the character 1", and on AZERTY that character needs Shift: "!1" and "!+1"
+; then collapse into the same Alt+Shift combo, so Alt+& did nothing and Alt+Shift+& moved the window.
 Loop 9 {
-    Hotkey("!" A_Index,  MakeGo(A_Index))
-    Hotkey("!+" A_Index, MakeMove(A_Index))
+    sc := Format("sc{:03X}", A_Index + 1)
+    Hotkey("!" sc,  MakeGo(A_Index))
+    Hotkey("!+" sc, MakeMove(A_Index))
 }
 
 MouseOverTaskbar() {
