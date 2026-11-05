@@ -39,7 +39,7 @@ Partner Center asks you to justify it. Paste:
 
 ## Store listing (English)
 
-**Product name:** Desktop Switcher
+**Product name:** Desktop Switcher - Virtual Desktop Shortcuts (reserved; Store ID `9MV9P36W441C`)
 
 **Short description**
 

@@ -29,7 +29,8 @@ Copy-Item "$AppDir\LICENSE.txt", "$AppDir\LICENSE-AutoHotkey.txt", "$AppDir\THIR
 
 $xml = (Get-Content (Join-Path $PSScriptRoot 'AppxManifest.template.xml') -Raw).
     Replace('{IDENTITY_NAME}', $id.IdentityName).Replace('{PUBLISHER}', $id.Publisher).
-    Replace('{PUBLISHER_DISPLAY_NAME}', $id.PublisherDisplayName).Replace('{VERSION}', $msixVersion)
+    Replace('{PUBLISHER_DISPLAY_NAME}', $id.PublisherDisplayName).Replace('{DISPLAY_NAME}', $id.DisplayName).Replace('{VERSION}', $msixVersion)
+if ($xml -match '\{[A-Z_]+\}') { throw "Unfilled placeholder in the manifest: $($Matches[0])" }
 [xml]$xml | Out-Null                                   # fail early on malformed XML
 [IO.File]::WriteAllText("$layout\AppxManifest.xml", $xml, (New-Object Text.UTF8Encoding $false))
 Write-Host "Layout ready: $layout  (version $msixVersion, identity $($id.IdentityName))"

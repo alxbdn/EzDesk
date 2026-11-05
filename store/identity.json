@@ -1,6 +1,8 @@
 {
-  "_comment": "Placeholders until the app name is reserved in Partner Center. Then copy the 3 values from Product management > Product identity.",
-  "IdentityName": "alxbdn.DesktopSwitcher",
-  "Publisher": "CN=alxbdn",
-  "PublisherDisplayName": "alxbdn"
+  "_comment": "From Partner Center > Product management > Product identity. DisplayName must match the reserved name exactly.",
+  "IdentityName": "alxbdn.DesktopSwitcher-VirtualDesktopShortcuts",
+  "Publisher": "CN=84E68D20-6D70-4B7F-B292-A07469E8D5A7",
+  "PublisherDisplayName": "alxbdn",
+  "DisplayName": "Desktop Switcher - Virtual Desktop Shortcuts",
+  "StoreId": "9MV9P36W441C"
 }
