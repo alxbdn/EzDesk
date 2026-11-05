@@ -30,6 +30,8 @@ Keep the folder where you extracted it: "Start with Windows" points to it. If yo
 | Click the tray icon | Task View |
 | Right-click the tray icon | Start with Windows, Help, Restart, Exit |
 
+Shortcuts use the physical keys of the number row, so they work on any keyboard layout. On AZERTY, that's `Alt + &`, `Alt + é`… with no Shift needed to get the digit.
+
 ## Uninstall
 
 Right-click the tray icon → untick **Start with Windows** → **Exit**, then delete the folder.
