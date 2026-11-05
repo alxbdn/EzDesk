@@ -160,10 +160,20 @@ Step(delta) {
 ; ---------------------------------------------------------------------
 ;  Tray menu and "Start with Windows"
 ; ---------------------------------------------------------------------
-; Simple mode: a shortcut in the user's Startup folder (no admin needed).
-; Admin mode (install.ps1): a scheduled task starts it, so the toggle is shown but locked.
+; Three ways to run, three ways to start with Windows:
+;   Simple mode (zip)        a shortcut in the user's Startup folder (no admin needed)
+;   Admin mode (install.ps1) a scheduled task: the item is shown checked and locked
+;   Store app (MSIX)         a startup task declared in the package; Windows manages it in
+;                            Settings > Apps > Startup (a packaged app can't write the real Startup folder)
 global STARTUP_LNK := A_Startup "\Desktop Switcher.lnk"
 STARTED_AT_LOGIN := A_Args.Length && A_Args[1] = "--startup"
+
+; Running from an MSIX package? GetCurrentPackageFullName returns APPMODEL_ERROR_NO_PACKAGE (15700) if not.
+IsPackaged() {
+    len := 0
+    return DllCall("GetCurrentPackageFullName", "UInt*", &len, "Ptr", 0, "Int") != 15700
+}
+global PACKAGED := IsPackaged()
 
 IsStartupOn() => FileExist(STARTUP_LNK) != ""
 
@@ -182,7 +192,9 @@ ToggleStartup(itemName, *) {
 A_TrayMenu.Delete()
 A_TrayMenu.Add("Task View", (*) => Send("#{Tab}"))
 A_TrayMenu.Add()
-if A_IsAdmin {
+if PACKAGED {
+    A_TrayMenu.Add("Start with Windows…", (*) => Run("ms-settings:startupapps"))
+} else if A_IsAdmin {
     A_TrayMenu.Add("Starts with Windows (admin mode)", (*) => 0)
     A_TrayMenu.Check("Starts with Windows (admin mode)")
     A_TrayMenu.Disable("Starts with Windows (admin mode)")
@@ -284,7 +296,19 @@ UpdateTray(*) {
     A_IconTip := "Desktop " n " of " c (name != "" ? " — " name : "")
 }
 
-if !STARTED_AT_LOGIN
+; Welcome tip on the very first launch only. (The Store's startup task can't pass --startup,
+; so "not started at login" isn't enough to avoid showing it at every logon.)
+FirstRun() {
+    flag := A_AppData "\DesktopSwitcher\welcome-shown"      ; per-package private copy when packaged
+    if FileExist(flag)
+        return false
+    try {
+        DirCreate(A_AppData "\DesktopSwitcher")
+        FileAppend("", flag)
+    }
+    return true
+}
+if !STARTED_AT_LOGIN && FirstRun()
     TrayTip("Alt + 1…9 switches desktops.`nNo numbered icon near the clock? Click ^ and drag it onto the taskbar.", "Desktop Switcher is running", "Mute")
 
 SetTimer(UpdateTray, -100)                          ; first contact with the DLL happens after start-up is complete
