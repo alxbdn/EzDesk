@@ -1,5 +1,4 @@
-
-https://github.com/user-attachments/assets/267437c0-4b8f-4ea9-a9be-71ae77f3ffa2
+https://github.com/user-attachments/assets/8d6bad23-e635-49c7-9c4d-a6ba07dd905d
 
 **[Get it from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)** · or [download the zip](https://github.com/alxbdn/win11-desktop-switcher/releases/latest/download/DesktopSwitcher.zip)
 
