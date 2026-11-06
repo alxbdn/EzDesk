@@ -34,6 +34,8 @@ jobs:
           if ($names -like '*\*') { throw 'zip entries must use / separators' }
           $out = & dist\DesktopSwitcher\DesktopSwitcher.exe /ErrorStdOut /validate dist\DesktopSwitcher\DesktopSwitcher.ahk 2>&1 | Out-String
           if ($LASTEXITCODE -ne 0) { throw "DesktopSwitcher.ahk failed validation: $out" }
+          $vi = (Get-Item dist\DesktopSwitcher\DesktopSwitcher.exe).VersionInfo
+          if ($vi.FileDescription -ne 'Desktop Switcher' -or $vi.ProductName -ne 'Desktop Switcher') { throw "exe not rebranded: '$($vi.FileDescription)' / '$($vi.ProductName)'" }
           Get-Content dist\DesktopSwitcher.zip.sha256
 
       - uses: actions/upload-artifact@v4

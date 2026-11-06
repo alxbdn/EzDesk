@@ -26,7 +26,7 @@ It starts with Windows; you can turn that off in **Settings › Apps › Startup
 5. No numbered icon near the clock? Click the **^** arrow next to it and drag the icon onto the taskbar
 6. Right-click the icon → **Start with Windows**, so it starts by itself next time
 
-> **"Windows protected your PC"?** Click **More info** → **Run anyway**. The exe isn't code-signed, so Windows doesn't recognize it. `DesktopSwitcher.exe` is the official AutoHotkey v2 runtime, renamed, and the zip is built by [GitHub Actions](.github/workflows/release.yml) from the code in this repo. Step 2 usually prevents the warning.
+> **"Windows protected your PC"?** Click **More info** → **Run anyway**. The exe isn't code-signed, so Windows doesn't recognize it. `DesktopSwitcher.exe` is the official AutoHotkey v2 runtime, renamed and given the app's own icon and name, and the zip is built by [GitHub Actions](.github/workflows/release.yml) from the code in this repo. Step 2 usually prevents the warning.
 
 Keep the folder where you extracted it: "Start with Windows" points to it. If you move the folder, start `DesktopSwitcher.exe` once from the new place and the shortcut follows.
 
