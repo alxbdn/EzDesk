@@ -1,4 +1,6 @@
-**Download `DesktopSwitcher.zip` below**, then:
+**Easiest: [get it from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)**: no warning, automatic updates.
+
+**Or download `DesktopSwitcher.zip` below**, then:
 
 1. Right-click the zip → **Properties** → tick **Unblock** → **OK**
 2. Right-click the zip → **Extract All…** → pick your **Documents** folder
