@@ -1,10 +1,13 @@
 # Generates the tray icons: a black rounded square with a white number, 1-9 plus 'more' for 10+.
 # Usage: .\make-icons.ps1 -OutDir <folder> [-Outline 0|1|2]   (border width in px at 16px; 0 = none)
-param([Parameter(Mandatory)] [string]$OutDir, [double]$Outline = 1)
+#        .\make-icons.ps1 -OutDir <folder> -Labels 1 -Sizes 16,24,32,48,64,128,256   (the exe's own icon)
+param([Parameter(Mandatory)] [string]$OutDir, [double]$Outline = 1,
+      [int[]]$Sizes = @(16, 20, 24, 32, 40, 48, 64),
+      [string[]]$Labels = @('1','2','3','4','5','6','7','8','9','+'))
 Add-Type -AssemblyName System.Drawing
 
-$sizes = 16, 20, 24, 32, 40, 48, 64
-$labels = @('1','2','3','4','5','6','7','8','9','+')
+$sizes = $Sizes
+$labels = $Labels
 $bg = [System.Drawing.Color]::Black
 
 function RoundRect([double]$x, [double]$y, [double]$w, [double]$h, [double]$r) {

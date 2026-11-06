@@ -39,6 +39,10 @@ try {
         $AhkLicense = Get-ChildItem "$tmp\ahk" -Filter 'license*.txt' | Select-Object -First 1 -ExpandProperty FullName
     }
     Copy-Item $AhkExe "$stage\DesktopSwitcher.exe"
+    # Own icon and name, so Windows lists "Desktop Switcher" (tray settings, Task Manager), not "AutoHotkey 64-bit"
+    New-Item -ItemType Directory -Force "$tmp\appicon" | Out-Null
+    & "$root\make-icons.ps1" -OutDir "$tmp\appicon" -Outline 1 -Labels 1 -Sizes 16,20,24,32,40,48,64,128,256 | Out-Null
+    & "$root\rebrand-exe.ps1" -Exe "$stage\DesktopSwitcher.exe" -Icon "$tmp\appicon\1.ico" -Version $Version
     if (-not $AhkLicense) { throw 'AutoHotkey license file not found' }
     Copy-Item $AhkLicense "$stage\LICENSE-AutoHotkey.txt"
 
