@@ -63,7 +63,7 @@ try {
 
     @"
 EzDesk $Version  (formerly Desktop Switcher)
-https://github.com/alxbdn/win11-desktop-switcher
+https://github.com/alxbdn/ezdesk
 
 START
   1. Double-click EzDesk.exe. A numbered icon appears next to the clock.

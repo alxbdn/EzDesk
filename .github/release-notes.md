@@ -12,4 +12,4 @@
 
 If Windows says *"Windows protected your PC"*: **More info** → **Run anyway**. The exe isn't code-signed. This zip was built by GitHub Actions from this repository's code; its SHA256 is in `EzDesk.zip.sha256`.
 
-Power users: admin mode (shortcuts also work over admin windows) is in the zip's `admin\` folder. See the [README](https://github.com/alxbdn/win11-desktop-switcher#power-users-admin-mode).
+Power users: admin mode (shortcuts also work over admin windows) is in the zip's `admin\` folder. See the [README](https://github.com/alxbdn/ezdesk#power-users-admin-mode).

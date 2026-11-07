@@ -19,9 +19,9 @@ After reserving the name, copy these 3 values from **Partner Center → your app
 ## Properties
 
 - **Category:** Productivity (or Utilities & tools)
-- **Privacy policy URL:** https://github.com/alxbdn/win11-desktop-switcher/blob/main/PRIVACY.md
-- **Website:** https://github.com/alxbdn/win11-desktop-switcher
-- **Support contact:** https://github.com/alxbdn/win11-desktop-switcher/issues
+- **Privacy policy URL:** https://github.com/alxbdn/ezdesk/blob/main/PRIVACY.md
+- **Website:** https://github.com/alxbdn/ezdesk
+- **Support contact:** https://github.com/alxbdn/ezdesk/issues
 
 ## Age ratings
 
@@ -35,7 +35,7 @@ Upload `EzDesk.msix` from the GitHub Actions artifact **EzDesk-store-msix**, bui
 
 Partner Center asks you to justify it. Paste:
 
-> EzDesk is a classic Win32 desktop app (the AutoHotkey v2 runtime running an open-source script). Full trust is required to register its global keyboard shortcuts (Alt+1…9 to switch virtual desktops, Alt+Shift+1…9 to move the active window), to react to the mouse wheel over the taskbar, to show its notification-area icon with the current desktop number, and to call the Windows virtual desktop APIs through the open-source VirtualDesktopAccessor library. It does not access the network, user files or personal data. Source: https://github.com/alxbdn/win11-desktop-switcher
+> EzDesk is a classic Win32 desktop app (the AutoHotkey v2 runtime running an open-source script). Full trust is required to register its global keyboard shortcuts (Alt+1…9 to switch virtual desktops, Alt+Shift+1…9 to move the active window), to react to the mouse wheel over the taskbar, to show its notification-area icon with the current desktop number, and to call the Windows virtual desktop APIs through the open-source VirtualDesktopAccessor library. It does not access the network, user files or personal data. Source: https://github.com/alxbdn/ezdesk
 
 ## Store listing (English)
 

@@ -1,6 +1,6 @@
 https://github.com/user-attachments/assets/f2da5e65-471d-4356-8566-0b6103217ed0
 
-**[Get it from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)** · or [download the zip](https://github.com/alxbdn/win11-desktop-switcher/releases/latest/download/EzDesk.zip)
+**[Get it from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)** · or [download the zip](https://github.com/alxbdn/ezdesk/releases/latest/download/EzDesk.zip)
 
 <img src="brand/ezdesk.svg" width="96" alt="EzDesk icon">
 
@@ -20,7 +20,7 @@ It starts with Windows; you can turn that off in **Settings › Apps › Startup
 
 ### From the zip (no Store, no admin, no console)
 
-1. **[Download EzDesk.zip](https://github.com/alxbdn/win11-desktop-switcher/releases/latest/download/EzDesk.zip)**
+1. **[Download EzDesk.zip](https://github.com/alxbdn/ezdesk/releases/latest/download/EzDesk.zip)**
 2. Right-click the zip → **Properties** → tick **Unblock** → **OK**
 3. Right-click the zip → **Extract All…** → pick your **Documents** folder → **Extract**
 4. Open the `EzDesk` folder and double-click **`EzDesk.exe`**

@@ -9,6 +9,6 @@ EzDesk **does not collect, store or send any personal data**.
 - It reads which virtual desktop is active, and listens for its own keyboard shortcuts (`Alt + 1…9`, `Alt + Shift + 1…9`) and for mouse-wheel scrolling over the taskbar, so it can switch desktops. Keystrokes are not recorded, stored or sent anywhere: any key that isn't one of its shortcuts goes straight through to your apps.
 - The only thing it writes to disk is a marker file showing that the welcome notification was already displayed, plus a Startup-folder shortcut if you turn on **Start with Windows** in the zip version.
 
-The source code is public: https://github.com/alxbdn/win11-desktop-switcher
+The source code is public: https://github.com/alxbdn/ezdesk
 
-Questions: open an issue at https://github.com/alxbdn/win11-desktop-switcher/issues
+Questions: open an issue at https://github.com/alxbdn/ezdesk/issues
