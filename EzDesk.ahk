@@ -234,7 +234,7 @@ if PACKAGED {
         A_TrayMenu.Check("Start with Windows")
     }
 }
-A_TrayMenu.Add("Help", (*) => Run("https://github.com/alxbdn/win11-desktop-switcher#readme"))
+A_TrayMenu.Add("Help", (*) => Run("https://github.com/alxbdn/ezdesk#readme"))
 A_TrayMenu.Add()
 A_TrayMenu.Add("Restart", (*) => Reload())
 A_TrayMenu.Add("Exit", (*) => ExitApp())
