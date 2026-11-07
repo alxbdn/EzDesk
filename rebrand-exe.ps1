@@ -164,12 +164,12 @@ $parts = @(); if ($Version -match '^\d+(\.\d+){0,3}') { $parts = @($Matches[0].S
 while ($parts.Count -lt 4) { $parts += 0 }
 $strings = [ordered]@{
     CompanyName      = 'alxbdn'
-    FileDescription  = 'Desktop Switcher'
+    FileDescription  = 'EzDesk'
     FileVersion      = ($parts -join '.')
     InternalName     = 'DesktopSwitcher'
     LegalCopyright   = 'Copyright (c) 2026 Alexandre B. (MIT)'
     OriginalFilename = 'DesktopSwitcher.exe'
-    ProductName      = 'Desktop Switcher'
+    ProductName      = 'EzDesk'
     ProductVersion   = $Version
     Comments         = "AutoHotkey v$AhkVersion runtime (GPLv2, https://www.autohotkey.com), renamed and rebranded to run DesktopSwitcher.ahk"
 }

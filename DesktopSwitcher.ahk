@@ -3,7 +3,7 @@
 Persistent
 
 ; =====================================================================
-;  Desktop Switcher
+;  EzDesk (formerly Desktop Switcher)
 ;    Alt + 1…9          go to desktop N
 ;    Alt + Shift + 1…9  move the active window to desktop N (and follow it)
 ;    Scroll on taskbar  previous / next desktop
@@ -17,7 +17,7 @@ Persistent
 
 ; Our icon right away, never AutoHotkey's green "H".
 TraySetIcon(A_ScriptDir "\icons\1.ico")
-A_IconTip := "Desktop Switcher (starting…)"
+A_IconTip := "EzDesk (starting…)"
 
 ; ---------------------------------------------------------------------
 ;  VirtualDesktopAccessor: Windows 11 and Windows 10 need different builds
@@ -26,14 +26,14 @@ global WIN_BUILD := Integer(StrSplit(A_OSVersion, ".")[3])
 global VDA  := A_ScriptDir (WIN_BUILD >= 22000 ? "\VirtualDesktopAccessor.dll" : "\VirtualDesktopAccessor-win10.dll")
 global hVDA := DllCall("LoadLibrary", "Str", VDA, "Ptr")
 if !hVDA {
-    MsgBox("Could not load " VDA, "Desktop Switcher", "Iconx")
+    MsgBox("Could not load " VDA, "EzDesk", "Iconx")
     ExitApp(1)
 }
 
 Proc(name, required := true) {
     p := DllCall("GetProcAddress", "Ptr", hVDA, "AStr", name, "Ptr")
     if (!p && required) {
-        MsgBox("VirtualDesktopAccessor.dll has no " name "().`nIt may not match this Windows build (" WIN_BUILD ").", "Desktop Switcher", "Iconx")
+        MsgBox("VirtualDesktopAccessor.dll has no " name "().`nIt may not match this Windows build (" WIN_BUILD ").", "EzDesk", "Iconx")
         ExitApp(1)
     }
     return p
@@ -62,8 +62,8 @@ VdaCall(p, args*) {
         vdaErrors += 1
         if (vdaErrors >= 3 && !vdaBroken) {
             vdaBroken := true
-            A_IconTip := "Desktop Switcher: not compatible with this Windows (build " WIN_BUILD ")"
-            TrayTip("The virtual-desktop library doesn't work on this Windows version (build " WIN_BUILD ").`nShortcuts are disabled. See Help in this icon's menu.", "Desktop Switcher", "Iconx Mute")
+            A_IconTip := "EzDesk: not compatible with this Windows (build " WIN_BUILD ")"
+            TrayTip("The virtual-desktop library doesn't work on this Windows version (build " WIN_BUILD ").`nShortcuts are disabled. See Help in this icon's menu.", "EzDesk", "Iconx Mute")
         }
         return -1
     }
@@ -199,7 +199,7 @@ IsStartupOn() => FileExist(STARTUP_LNK) != ""
 
 SetStartup(on) {
     if on                                           ; (re)written each launch, so it follows the folder if it moves
-        FileCreateShortcut(A_AhkPath, STARTUP_LNK, A_ScriptDir, '"' A_ScriptFullPath '" --startup', "Desktop Switcher", A_ScriptDir "\icons\1.ico")
+        FileCreateShortcut(A_AhkPath, STARTUP_LNK, A_ScriptDir, '"' A_ScriptFullPath '" --startup', "EzDesk", A_ScriptDir "\icons\1.ico")
     else if IsStartupOn()
         FileDelete(STARTUP_LNK)
 }
@@ -293,11 +293,11 @@ UpdateTray(*) {
     }
     if (i < 0 || c <= 0) {                          ; virtual desktops not reachable (yet)
         failures += 1
-        A_IconTip := "Desktop Switcher: waiting for Windows virtual desktops…"
+        A_IconTip := "EzDesk: waiting for Windows virtual desktops…"
         SetTimer(UpdateTray, Min(1000 * 2 ** Min(failures, 4), 10000))   ; back off: 2 s … 10 s
         if (failures = 6 && !warned) {
             warned := true
-            TrayTip("Can't reach Windows' virtual desktops (Windows build " WIN_BUILD ").`nTry Restart from this icon's menu.", "Desktop Switcher", "Iconx Mute")
+            TrayTip("Can't reach Windows' virtual desktops (Windows build " WIN_BUILD ").`nTry Restart from this icon's menu.", "EzDesk", "Iconx Mute")
         }
         return
     }
@@ -329,6 +329,6 @@ FirstRun() {
     return true
 }
 if !STARTED_AT_LOGIN && FirstRun()
-    TrayTip("Alt + 1…9 switches desktops.`nNo numbered icon near the clock? Click ^ and drag it onto the taskbar.", "Desktop Switcher is running", "Mute")
+    TrayTip("Alt + 1…9 switches desktops.`nNo numbered icon near the clock? Click ^ and drag it onto the taskbar.", "EzDesk is running", "Mute")
 
 SetTimer(UpdateTray, -100)                          ; first contact with the DLL happens after start-up is complete

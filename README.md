@@ -2,9 +2,11 @@ https://github.com/user-attachments/assets/8d6bad23-e635-49c7-9c4d-a6ba07dd905d
 
 **[Get it from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)** · or [download the zip](https://github.com/alxbdn/win11-desktop-switcher/releases/latest/download/DesktopSwitcher.zip)
 
-# win11-desktop-switcher
+<img src="brand/ezdesk.svg" width="96" alt="EzDesk icon">
 
-Fast virtual-desktop switching for Windows 11, with a tray icon that shows which desktop you're on. It also runs on Windows 10. Built on [AutoHotkey v2](https://www.autohotkey.com) and [VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor).
+# EzDesk
+
+Fast virtual-desktop switching for Windows 11, with a tray icon that shows which desktop you're on. Formerly called Desktop Switcher. It also runs on Windows 10. Built on [AutoHotkey v2](https://www.autohotkey.com) and [VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor).
 
 ![Tray icons](docs/icons.png)
 
@@ -12,7 +14,7 @@ Fast virtual-desktop switching for Windows 11, with a tray icon that shows which
 
 ### From the Microsoft Store (recommended)
 
-**[Get Desktop Switcher from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)**, click **Get**, then **Open**. It's signed by Microsoft, so there's no warning, and it updates itself.
+**[Get EzDesk from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)**, click **Get**, then **Open**. It's signed by Microsoft, so there's no warning, and it updates itself.
 
 It starts with Windows; you can turn that off in **Settings › Apps › Startup**. No numbered icon near the clock? Click the **^** arrow next to it and drag the icon onto the taskbar.
 
@@ -50,7 +52,7 @@ Shortcuts use the physical keys of the number row, so they work on any keyboard 
 
 ## Uninstall
 
-- **Store version:** Settings › Apps › Installed apps → Desktop Switcher → **Uninstall**.
+- **Store version:** Settings › Apps › Installed apps → EzDesk (Desktop Switcher in older versions) → **Uninstall**.
 - **Zip version:** right-click the tray icon → untick **Start with Windows** → **Exit**, then delete the folder.
 
 Don't keep both installed: they'd both react to the same shortcuts.

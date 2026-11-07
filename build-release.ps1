@@ -39,10 +39,9 @@ try {
         $AhkLicense = Get-ChildItem "$tmp\ahk" -Filter 'license*.txt' | Select-Object -First 1 -ExpandProperty FullName
     }
     Copy-Item $AhkExe "$stage\DesktopSwitcher.exe"
-    # Own icon and name, so Windows lists "Desktop Switcher" (tray settings, Task Manager), not "AutoHotkey 64-bit"
-    New-Item -ItemType Directory -Force "$tmp\appicon" | Out-Null
-    & "$root\make-icons.ps1" -OutDir "$tmp\appicon" -Outline 1 -Labels 1 -Sizes 16,20,24,32,40,48,64,128,256 | Out-Null
-    & "$root\rebrand-exe.ps1" -Exe "$stage\DesktopSwitcher.exe" -Icon "$tmp\appicon\1.ico" -Version $Version
+    # Own icon and name, so Windows lists "EzDesk" (tray settings, Task Manager), not "AutoHotkey 64-bit".
+    # The file keeps its name, so existing shortcuts, the admin-mode task and the Store package still find it.
+    & "$root\rebrand-exe.ps1" -Exe "$stage\DesktopSwitcher.exe" -Icon "$root\brand\ezdesk.ico" -Version $Version
     if (-not $AhkLicense) { throw 'AutoHotkey license file not found' }
     Copy-Item $AhkLicense "$stage\LICENSE-AutoHotkey.txt"
 
@@ -64,7 +63,7 @@ try {
     & "$root\make-icons.ps1" -OutDir "$stage\icons" -Outline 1 | Out-Null
 
     @"
-Desktop Switcher $Version
+EzDesk $Version  (formerly Desktop Switcher)
 https://github.com/alxbdn/win11-desktop-switcher
 
 START

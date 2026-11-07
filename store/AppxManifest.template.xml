@@ -36,7 +36,7 @@
       <Extensions>
         <!-- Start with Windows: active once the app has been launched, toggled in Settings > Apps > Startup -->
         <desktop:Extension Category="windows.startupTask" Executable="DesktopSwitcher.exe" EntryPoint="Windows.FullTrustApplication">
-          <desktop:StartupTask TaskId="DesktopSwitcherStartup" Enabled="true" DisplayName="Desktop Switcher" />
+          <desktop:StartupTask TaskId="DesktopSwitcherStartup" Enabled="true" DisplayName="EzDesk" />
         </desktop:Extension>
       </Extensions>
     </Application>

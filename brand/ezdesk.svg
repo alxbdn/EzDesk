@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="1024" height="1024">
+  <!-- EzDesk app icon, V25 "Aurora": Desky with e and z eyes -->
+  <defs>
+    <linearGradient id="aurora" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2BD9A0"/>
+      <stop offset="1" stop-color="#2F6BFF"/>
+    </linearGradient>
+  </defs>
+  <rect x="5" y="5" width="90" height="90" rx="22" fill="url(#aurora)"/>
+  <rect x="18" y="22" width="64" height="46" rx="12" fill="#121318"/>
+  <rect x="45" y="67" width="10" height="10" fill="#121318"/>
+  <rect x="34" y="76" width="32" height="7" rx="3.5" fill="#121318"/>
+  <g fill="none" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M32.5 44 H45.5 A6.5 6.5 0 1 0 43.6 48.6" stroke="#FFFFFF"/>
+    <path d="M54 37.5 H66 L54 50.5 H66" stroke="#A7F3D0"/>
+    <path d="M44 59 Q50 63 56 59" stroke="#FFFFFF"/>
+  </g>
+</svg>
