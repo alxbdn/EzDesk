@@ -1,4 +1,4 @@
-https://github.com/user-attachments/assets/8d6bad23-e635-49c7-9c4d-a6ba07dd905d
+https://github.com/user-attachments/assets/f2da5e65-471d-4356-8566-0b6103217ed0
 
 **[Get it from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)** · or [download the zip](https://github.com/alxbdn/win11-desktop-switcher/releases/latest/download/EzDesk.zip)
 
