@@ -2,9 +2,9 @@
 
 The release zip bundles two third-party components.
 
-## AutoHotkey v2 (`DesktopSwitcher.exe`)
+## AutoHotkey v2 (`EzDesk.exe`)
 
-`DesktopSwitcher.exe` is `AutoHotkey64.exe` from [AutoHotkey v2.0.31](https://github.com/AutoHotkey/AutoHotkey/releases/tag/v2.0.31), renamed so that it runs `DesktopSwitcher.ahk` when double-clicked. The build (`rebrand-exe.ps1`) also replaces two resources in it, so Windows shows the app's own name and icon: the main icon and the version information. The program code itself is unchanged. It's licensed under the GNU General Public License v2: see `LICENSE-AutoHotkey.txt` in the zip. Source code: https://github.com/AutoHotkey/AutoHotkey
+`EzDesk.exe` is `AutoHotkey64.exe` from [AutoHotkey v2.0.31](https://github.com/AutoHotkey/AutoHotkey/releases/tag/v2.0.31), renamed so that it runs `EzDesk.ahk` when double-clicked. The build (`rebrand-exe.ps1`) also replaces two resources in it, so Windows shows the app's own name and icon: the main icon and the version information. The program code itself is unchanged. It's licensed under the GNU General Public License v2: see `LICENSE-AutoHotkey.txt` in the zip. Source code: https://github.com/AutoHotkey/AutoHotkey
 
 ## VirtualDesktopAccessor (`VirtualDesktopAccessor.dll`, `VirtualDesktopAccessor-win10.dll`)
 

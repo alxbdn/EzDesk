@@ -29,7 +29,7 @@ Answer "No" to every content question (no violence, chat, user-generated content
 
 ## Packages
 
-Upload `DesktopSwitcher.msix` from the GitHub Actions artifact **DesktopSwitcher-store-msix**, built with your real identity.
+Upload `EzDesk.msix` from the GitHub Actions artifact **EzDesk-store-msix**, built with your real identity.
 
 ### Restricted capability: `runFullTrust`
 

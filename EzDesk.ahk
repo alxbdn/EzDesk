@@ -4,6 +4,7 @@ Persistent
 
 ; =====================================================================
 ;  EzDesk (formerly Desktop Switcher)
+;    EzDesk.exe is the AutoHotkey v2 runtime, renamed: it runs EzDesk.ahk next to it
 ;    Alt + 1…9          go to desktop N
 ;    Alt + Shift + 1…9  move the active window to desktop N (and follow it)
 ;    Scroll on taskbar  previous / next desktop
@@ -185,7 +186,8 @@ Step(delta) {
 ;   Admin mode (install.ps1) a scheduled task: the item is shown checked and locked
 ;   Store app (MSIX)         a startup task declared in the package; Windows manages it in
 ;                            Settings > Apps > Startup (a packaged app can't write the real Startup folder)
-global STARTUP_LNK := A_Startup "\Desktop Switcher.lnk"
+global STARTUP_LNK := A_Startup "\EzDesk.lnk"
+global OLD_STARTUP_LNK := A_Startup "\Desktop Switcher.lnk"     ; before the rename to EzDesk
 STARTED_AT_LOGIN := A_Args.Length && A_Args[1] = "--startup"
 
 ; Running from an MSIX package? GetCurrentPackageFullName returns APPMODEL_ERROR_NO_PACKAGE (15700) if not.
@@ -199,7 +201,7 @@ IsStartupOn() => FileExist(STARTUP_LNK) != ""
 
 SetStartup(on) {
     if on                                           ; (re)written each launch, so it follows the folder if it moves
-        FileCreateShortcut(A_AhkPath, STARTUP_LNK, A_ScriptDir, '"' A_ScriptFullPath '" --startup', "EzDesk", A_ScriptDir "\icons\1.ico")
+        FileCreateShortcut(A_AhkPath, STARTUP_LNK, A_ScriptDir, '"' A_ScriptFullPath '" --startup', "EzDesk")   ; icon: the exe's own
     else if IsStartupOn()
         FileDelete(STARTUP_LNK)
 }
@@ -207,6 +209,13 @@ SetStartup(on) {
 ToggleStartup(itemName, *) {
     SetStartup(!IsStartupOn())
     IsStartupOn() ? A_TrayMenu.Check(itemName) : A_TrayMenu.Uncheck(itemName)
+}
+
+; Upgrading from Desktop Switcher: "Start with Windows" was on under the old shortcut name.
+; Move it to the new name, pointing at this copy, so it stays on and only one copy starts.
+if !PACKAGED && !A_IsAdmin && FileExist(OLD_STARTUP_LNK) {
+    try FileDelete(OLD_STARTUP_LNK)
+    SetStartup(true)
 }
 
 A_TrayMenu.Delete()
@@ -319,11 +328,11 @@ UpdateTray(*) {
 ; Welcome tip on the very first launch only. (The Store's startup task can't pass --startup,
 ; so "not started at login" isn't enough to avoid showing it at every logon.)
 FirstRun() {
-    flag := A_AppData "\DesktopSwitcher\welcome-shown"      ; per-package private copy when packaged
-    if FileExist(flag)
+    flag := A_AppData "\EzDesk\welcome-shown"               ; per-package private copy when packaged
+    if FileExist(flag) || FileExist(A_AppData "\DesktopSwitcher\welcome-shown")   ; already welcomed before the rename
         return false
     try {
-        DirCreate(A_AppData "\DesktopSwitcher")
+        DirCreate(A_AppData "\EzDesk")
         FileAppend("", flag)
     }
     return true
