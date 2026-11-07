@@ -39,7 +39,7 @@ Partner Center asks you to justify it. Paste:
 
 ## Store listing (English)
 
-**Product name:** EzDesk - Virtual Desktop Switcher (Store ID `9MV9P36W441C`). Reserve this exact name in Partner Center before submitting: it must match `DisplayName` in `store/identity.json`. Earlier name: Desktop Switcher - Virtual Desktop Shortcuts.
+**Product name:** EzDesk (reserved; Store ID `9MV9P36W441C`). It must match `DisplayName` in `store/identity.json`. Earlier name: Desktop Switcher - Virtual Desktop Shortcuts.
 
 **Short description**
 
