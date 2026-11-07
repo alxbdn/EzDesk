@@ -7,7 +7,7 @@
 param(
     [string]$InstallDir = "$env:ProgramFiles\EzDesk",
     [string]$User       = "$env:USERDOMAIN\$env:USERNAME",   # captured before elevation, so the task is yours
-    [double]$Outline    = 0,
+    [double]$Outline    = 1,
     [string]$Log        = ""
 )
 $ErrorActionPreference = 'Stop'

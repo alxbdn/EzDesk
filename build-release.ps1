@@ -59,7 +59,7 @@ try {
     Copy-Item "$root\admin\*" "$stage\admin"
     Copy-Item "$root\LICENSE" "$stage\LICENSE.txt"
     Copy-Item "$root\THIRD-PARTY-NOTICES.md" "$stage\THIRD-PARTY-NOTICES.txt"
-    & "$root\make-icons.ps1" -OutDir "$stage\icons" -Outline 0 | Out-Null
+    & "$root\make-icons.ps1" -OutDir "$stage\icons" -Outline 1 | Out-Null
 
     @"
 EzDesk $Version  (formerly Desktop Switcher)
