@@ -1,12 +1,13 @@
-# Admin mode: installs Desktop Switcher into Program Files and starts it at logon with admin rights,
+# Admin mode: installs EzDesk into Program Files and starts it at logon with admin rights,
 # so its shortcuts also work over admin windows (Task Manager, installers, admin terminals).
 # Usage:  powershell -ExecutionPolicy Bypass -File .\install.ps1     (or double-click "Install admin mode.cmd")
 # Works from the release zip (uses the bundled files) or from a clone of the repo (downloads what's missing).
-# Safe to run again: it updates an existing install in place.
+# Safe to run again: it updates an existing install in place, and replaces a pre-rename
+# "Desktop Switcher" install (its task, folder and startup shortcut).
 param(
-    [string]$InstallDir = "$env:ProgramFiles\DesktopSwitcher",
+    [string]$InstallDir = "$env:ProgramFiles\EzDesk",
     [string]$User       = "$env:USERDOMAIN\$env:USERNAME",   # captured before elevation, so the task is yours
-    [double]$Outline    = 1,
+    [double]$Outline    = 0,
     [string]$Log        = ""
 )
 $ErrorActionPreference = 'Stop'
@@ -20,12 +21,15 @@ $Dlls = @(
        Url  = 'https://github.com/Ciantic/VirtualDesktopAccessor/releases/download/2019-windows10/VirtualDesktopAccessor.dll'
        Sha  = '145431BC2090281838DE31824BC829DD35688B13488F4850F4BC5F25F5E599DA' }
 )
-$TaskName  = 'Desktop Switcher'
+$TaskName  = 'EzDesk'
+# Before the rename to EzDesk
+$OldTaskName   = 'Desktop Switcher'
+$OldInstallDir = "$env:ProgramFiles\DesktopSwitcher"
 
 # --- Re-launch elevated if needed; show the elevated run's output here when it finishes ----------
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
-    $Log = Join-Path $env:TEMP 'desktop-switcher-install.log'
+    $Log = Join-Path $env:TEMP 'ezdesk-install.log'
     Remove-Item $Log -ErrorAction SilentlyContinue
     $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -InstallDir `"$InstallDir`" -User `"$User`" -Outline $Outline -Log `"$Log`""
     Write-Host 'Asking for admin rights (UAC prompt)...'
@@ -37,19 +41,19 @@ function Say($msg) { Write-Host $msg; if ($Log) { Add-Content -Path $Log -Value 
 
 try {
     # Release zip: this script sits in admin\ next to the app files. Repo clone: same folder.
-    $src = if (Test-Path "$PSScriptRoot\DesktopSwitcher.ahk") { $PSScriptRoot } else { Split-Path $PSScriptRoot }
-    if (-not (Test-Path "$src\DesktopSwitcher.ahk")) { throw "DesktopSwitcher.ahk not found next to $PSScriptRoot" }
+    $src = if (Test-Path "$PSScriptRoot\EzDesk.ahk") { $PSScriptRoot } else { Split-Path $PSScriptRoot }
+    if (-not (Test-Path "$src\EzDesk.ahk")) { throw "EzDesk.ahk not found next to $PSScriptRoot" }
 
     # The elevated run may be a different admin account, so look up the *target* user's profile.
     $sid = (New-Object Security.Principal.NTAccount $User).Translate([Security.Principal.SecurityIdentifier]).Value
     $userProfile = (Get-CimInstance Win32_UserProfile | Where-Object SID -eq $sid).LocalPath
 
-    # --- Runtime: bundled DesktopSwitcher.exe (renamed AutoHotkey v2), else an AutoHotkey install --
+    # --- Runtime: bundled EzDesk.exe (renamed AutoHotkey v2), else an AutoHotkey install ------------
     $candidates = @(
-        "$src\DesktopSwitcher.exe",
+        "$src\EzDesk.exe",
         "$userProfile\AppData\Local\Programs\AutoHotkey\v2\AutoHotkey64.exe",
         "$env:ProgramFiles\AutoHotkey\v2\AutoHotkey64.exe",
-        "$InstallDir\DesktopSwitcher.exe"
+        "$InstallDir\EzDesk.exe"
     )
     $exe = $candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
     if (-not $exe) {
@@ -60,21 +64,33 @@ try {
     }
     Say "Runtime: $exe"
 
-    # --- Stop every running copy (admin task or simple mode) so files can be replaced ------------
-    if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) { Stop-ScheduledTask -TaskName $TaskName }
-    Get-CimInstance Win32_Process -Filter "Name='DesktopSwitcher.exe' OR Name='AutoHotkey64.exe'" |
-        Where-Object { $_.Name -eq 'DesktopSwitcher.exe' -or $_.CommandLine -like '*DesktopSwitcher.ahk*' } |
+    # --- Stop every running copy (admin task or simple mode, either name) so files can be replaced --
+    foreach ($t in $TaskName, $OldTaskName) {
+        if (Get-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue) { Stop-ScheduledTask -TaskName $t }
+    }
+    Get-CimInstance Win32_Process -Filter "Name='EzDesk.exe' OR Name='DesktopSwitcher.exe' OR Name='AutoHotkey64.exe'" |
+        Where-Object { $_.Name -ne 'AutoHotkey64.exe' -or $_.CommandLine -like '*EzDesk.ahk*' -or $_.CommandLine -like '*DesktopSwitcher.ahk*' } |
         ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Start-Sleep -Milliseconds 800
 
-    # Simple mode's startup shortcut would start a second copy at logon: remove it.
-    $lnk = "$userProfile\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\Desktop Switcher.lnk"
-    if (Test-Path $lnk) { Remove-Item $lnk -Force; Say 'Removed the simple-mode startup shortcut' }
+    # Simple mode's startup shortcut would start a second copy at logon: remove it (either name).
+    $startup = "$userProfile\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup"
+    foreach ($lnk in "$startup\EzDesk.lnk", "$startup\Desktop Switcher.lnk") {
+        if (Test-Path $lnk) { Remove-Item $lnk -Force; Say "Removed the simple-mode startup shortcut ($(Split-Path $lnk -Leaf))" }
+    }
+
+    # Admin mode from before the rename: its task and folder are replaced by the EzDesk ones.
+    if (Get-ScheduledTask -TaskName $OldTaskName -ErrorAction SilentlyContinue) {
+        Unregister-ScheduledTask -TaskName $OldTaskName -Confirm:$false; Say "Removed the old '$OldTaskName' startup task"
+    }
+    if ((Test-Path $OldInstallDir) -and ($OldInstallDir -ne $InstallDir) -and (Test-Path "$OldInstallDir\DesktopSwitcher.ahk")) {
+        Remove-Item $OldInstallDir -Recurse -Force; Say "Removed the old install folder $OldInstallDir"
+    }
 
     # --- Files -----------------------------------------------------------------------------------
     New-Item -ItemType Directory -Force "$InstallDir\icons" | Out-Null
-    Copy-Item "$src\DesktopSwitcher.ahk" $InstallDir -Force
-    if ($exe -ne "$InstallDir\DesktopSwitcher.exe") { Copy-Item $exe "$InstallDir\DesktopSwitcher.exe" -Force }
+    Copy-Item "$src\EzDesk.ahk" $InstallDir -Force
+    if ($exe -ne "$InstallDir\EzDesk.exe") { Copy-Item $exe "$InstallDir\EzDesk.exe" -Force }
     Remove-Item "$InstallDir\AutoHotkey64.exe", "$InstallDir\install-startup.ps1" -ErrorAction SilentlyContinue   # older layouts
 
     foreach ($d in $Dlls) {
@@ -103,7 +119,7 @@ try {
     Say 'Permissions: admin-only write'
 
     # --- Startup task ----------------------------------------------------------------------------
-    $action    = New-ScheduledTaskAction -Execute "$InstallDir\DesktopSwitcher.exe" -Argument "`"$InstallDir\DesktopSwitcher.ahk`" --startup" -WorkingDirectory $InstallDir
+    $action    = New-ScheduledTaskAction -Execute "$InstallDir\EzDesk.exe" -Argument "`"$InstallDir\EzDesk.ahk`" --startup" -WorkingDirectory $InstallDir
     $trigger   = New-ScheduledTaskTrigger -AtLogOn -User $User
     $trigger.Delay = 'PT5S'                                          # let Explorer start first
     $principal = New-ScheduledTaskPrincipal -UserId $User -LogonType Interactive -RunLevel Highest

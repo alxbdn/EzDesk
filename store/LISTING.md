@@ -29,17 +29,17 @@ Answer "No" to every content question (no violence, chat, user-generated content
 
 ## Packages
 
-Upload `DesktopSwitcher.msix` from the GitHub Actions artifact **DesktopSwitcher-store-msix**, built with your real identity.
+Upload `EzDesk.msix` from the GitHub Actions artifact **EzDesk-store-msix**, built with your real identity.
 
 ### Restricted capability: `runFullTrust`
 
 Partner Center asks you to justify it. Paste:
 
-> Desktop Switcher is a classic Win32 desktop app (the AutoHotkey v2 runtime running an open-source script). Full trust is required to register its global keyboard shortcuts (Alt+1…9 to switch virtual desktops, Alt+Shift+1…9 to move the active window), to react to the mouse wheel over the taskbar, to show its notification-area icon with the current desktop number, and to call the Windows virtual desktop APIs through the open-source VirtualDesktopAccessor library. It does not access the network, user files or personal data. Source: https://github.com/alxbdn/win11-desktop-switcher
+> EzDesk is a classic Win32 desktop app (the AutoHotkey v2 runtime running an open-source script). Full trust is required to register its global keyboard shortcuts (Alt+1…9 to switch virtual desktops, Alt+Shift+1…9 to move the active window), to react to the mouse wheel over the taskbar, to show its notification-area icon with the current desktop number, and to call the Windows virtual desktop APIs through the open-source VirtualDesktopAccessor library. It does not access the network, user files or personal data. Source: https://github.com/alxbdn/win11-desktop-switcher
 
 ## Store listing (English)
 
-**Product name:** Desktop Switcher - Virtual Desktop Shortcuts (reserved; Store ID `9MV9P36W441C`)
+**Product name:** EzDesk (reserved; Store ID `9MV9P36W441C`). It must match `DisplayName` in `store/identity.json`. Earlier name: Desktop Switcher - Virtual Desktop Shortcuts.
 
 **Short description**
 
@@ -47,7 +47,7 @@ Partner Center asks you to justify it. Paste:
 
 **Description**
 
-> Windows has virtual desktops, but no shortcut to jump straight to a given desktop, and no way to see which one you're on. Desktop Switcher adds both.
+> Windows has virtual desktops, but no shortcut to jump straight to a given desktop, and no way to see which one you're on. EzDesk adds both.
 >
 > • Alt + 1…9: go straight to desktop N, or create it if it doesn't exist yet
 > • Alt + Shift + 1…9: send the active window to desktop N (a new one if needed) and follow it
@@ -76,4 +76,6 @@ Partner Center asks you to justify it. Paste:
 
 **What's new in this version**
 
-> First Store release. Works on Windows 10, starts with Windows, and AZERTY keyboards are supported.
+> Desktop Switcher is now EzDesk: a new name and a new icon. Same shortcuts, same app, nothing to set up again.
+
+**Logo for the listing:** `brand/ezdesk-1080.png` (1:1 box art). Larger sizes come from `brand/ezdesk.svg`.

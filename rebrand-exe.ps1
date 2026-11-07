@@ -1,7 +1,7 @@
 # Gives the renamed AutoHotkey runtime its own identity: replaces the exe's main icon and its
 # version information (the name Windows shows in Settings > Personalization > Taskbar,
 # Task Manager, file properties...). Uses the Win32 UpdateResource API, no external tool.
-# Usage: .\rebrand-exe.ps1 -Exe DesktopSwitcher.exe -Icon app.ico -Version 1.1.1
+# Usage: .\rebrand-exe.ps1 -Exe EzDesk.exe -Icon app.ico -Version 1.1.1
 param(
     [Parameter(Mandatory)] [string]$Exe,
     [Parameter(Mandatory)] [string]$Icon,
@@ -164,14 +164,14 @@ $parts = @(); if ($Version -match '^\d+(\.\d+){0,3}') { $parts = @($Matches[0].S
 while ($parts.Count -lt 4) { $parts += 0 }
 $strings = [ordered]@{
     CompanyName      = 'alxbdn'
-    FileDescription  = 'Desktop Switcher'
+    FileDescription  = 'EzDesk'
     FileVersion      = ($parts -join '.')
-    InternalName     = 'DesktopSwitcher'
+    InternalName     = 'EzDesk'
     LegalCopyright   = 'Copyright (c) 2026 Alexandre B. (MIT)'
-    OriginalFilename = 'DesktopSwitcher.exe'
-    ProductName      = 'Desktop Switcher'
+    OriginalFilename = 'EzDesk.exe'
+    ProductName      = 'EzDesk'
     ProductVersion   = $Version
-    Comments         = "AutoHotkey v$AhkVersion runtime (GPLv2, https://www.autohotkey.com), renamed and rebranded to run DesktopSwitcher.ahk"
+    Comments         = "AutoHotkey v$AhkVersion runtime (GPLv2, https://www.autohotkey.com), renamed and rebranded to run EzDesk.ahk"
 }
 $r = [ExeRebrand]::Apply((Resolve-Path $Exe).Path, (Resolve-Path $Icon).Path, [int[]]$parts, [string[]]$strings.Keys, [string[]]$strings.Values)
 "rebranded $(Split-Path $Exe -Leaf): $r"

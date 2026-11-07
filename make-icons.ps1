@@ -1,14 +1,17 @@
-# Generates the tray icons: a black rounded square with a white number, 1-9 plus 'more' for 10+.
-# Usage: .\make-icons.ps1 -OutDir <folder> [-Outline 0|1|2]   (border width in px at 16px; 0 = none)
-#        .\make-icons.ps1 -OutDir <folder> -Labels 1 -Sizes 16,24,32,48,64,128,256   (the exe's own icon)
-param([Parameter(Mandatory)] [string]$OutDir, [double]$Outline = 1,
+# Generates the tray icons in the EzDesk colours: a rounded square with the app icon's mint-to-blue
+# gradient and a dark number (the colour of Desky's screen), 1-9 plus 'more' for 10+.
+# The dark number keeps its contrast across the whole gradient; a white one would vanish on the mint end.
+# Usage: .\make-icons.ps1 -OutDir <folder> [-Outline 0|1|2]   (white border width in px at 16px; 0 = none)
+param([Parameter(Mandatory)] [string]$OutDir, [double]$Outline = 0,
       [int[]]$Sizes = @(16, 20, 24, 32, 40, 48, 64),
       [string[]]$Labels = @('1','2','3','4','5','6','7','8','9','+'))
 Add-Type -AssemblyName System.Drawing
 
 $sizes = $Sizes
 $labels = $Labels
-$bg = [System.Drawing.Color]::Black
+$gradFrom = [System.Drawing.ColorTranslator]::FromHtml('#2BD9A0')   # brand\ezdesk.svg, "aurora"
+$gradTo   = [System.Drawing.ColorTranslator]::FromHtml('#2F6BFF')
+$ink      = New-Object System.Drawing.SolidBrush ([System.Drawing.ColorTranslator]::FromHtml('#121318'))
 
 function RoundRect([double]$x, [double]$y, [double]$w, [double]$h, [double]$r) {
     $p = New-Object System.Drawing.Drawing2D.GraphicsPath
@@ -32,7 +35,9 @@ function New-Png([string]$text, [int]$s) {
     $r = [math]::Max(2, [int]($s * 0.13))
     $g.PixelOffsetMode = 'Half'                     # pixel edges on whole coordinates: 1px lines stay crisp
     $side = $s - 2*$m
-    $g.FillPath((New-Object System.Drawing.SolidBrush $bg), (RoundRect $m $m $side $side $r))
+    $area = New-Object System.Drawing.RectangleF $m, $m, $side, $side
+    $bg = New-Object System.Drawing.Drawing2D.LinearGradientBrush $area, $gradFrom, $gradTo, 45.0   # top-left to bottom-right
+    $g.FillPath($bg, (RoundRect $m $m $side $side $r))
 
     # optional white border, drawn inside the square so the icon doesn't grow
     if ($Outline -gt 0) {
@@ -51,7 +56,7 @@ function New-Png([string]$text, [int]$s) {
     $mx = New-Object System.Drawing.Drawing2D.Matrix
     $mx.Translate(($s - $b.Width) / 2 - $b.X, ($s - $b.Height) / 2 - $b.Y)
     $tp.Transform($mx)
-    $g.FillPath([System.Drawing.Brushes]::White, $tp)
+    $g.FillPath($ink, $tp)
 
     $g.Dispose()
     # Classic DIB icon frame: BITMAPINFOHEADER + bottom-up BGRA pixels + 1bpp AND mask

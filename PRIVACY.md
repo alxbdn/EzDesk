@@ -1,8 +1,8 @@
-# Privacy policy: Desktop Switcher
+# Privacy policy: EzDesk (formerly Desktop Switcher)
 
-*Last updated: November 5, 2026*
+*Last updated: November 7, 2026*
 
-Desktop Switcher **does not collect, store or send any personal data**.
+EzDesk **does not collect, store or send any personal data**.
 
 - It has no account, no analytics, no telemetry and no ads.
 - It doesn't connect to the internet. The only exception is the **Help** item in its tray menu, which opens this project's GitHub page in your web browser.

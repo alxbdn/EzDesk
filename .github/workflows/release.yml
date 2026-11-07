@@ -27,21 +27,21 @@ jobs:
         shell: powershell
         run: |
           Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $z = [IO.Compression.ZipFile]::OpenRead("dist\DesktopSwitcher.zip"); $names = $z.Entries.FullName; $z.Dispose()
-          $required = 'DesktopSwitcher.exe', 'DesktopSwitcher.ahk', 'VirtualDesktopAccessor.dll', 'VirtualDesktopAccessor-win10.dll', 'icons/1.ico', 'icons/more.ico',
+          $z = [IO.Compression.ZipFile]::OpenRead("dist\EzDesk.zip"); $names = $z.Entries.FullName; $z.Dispose()
+          $required = 'EzDesk.exe', 'EzDesk.ahk', 'VirtualDesktopAccessor.dll', 'VirtualDesktopAccessor-win10.dll', 'icons/1.ico', 'icons/more.ico',
                       'README.txt', 'LICENSE.txt', 'LICENSE-AutoHotkey.txt', 'admin/install.ps1', 'admin/Install admin mode.cmd'
-          foreach ($n in $required) { if ($names -notcontains "DesktopSwitcher/$n") { throw "zip is missing $n" } }
+          foreach ($n in $required) { if ($names -notcontains "EzDesk/$n") { throw "zip is missing $n" } }
           if ($names -like '*\*') { throw 'zip entries must use / separators' }
-          $out = & dist\DesktopSwitcher\DesktopSwitcher.exe /ErrorStdOut /validate dist\DesktopSwitcher\DesktopSwitcher.ahk 2>&1 | Out-String
-          if ($LASTEXITCODE -ne 0) { throw "DesktopSwitcher.ahk failed validation: $out" }
-          $vi = (Get-Item dist\DesktopSwitcher\DesktopSwitcher.exe).VersionInfo
-          if ($vi.FileDescription -ne 'Desktop Switcher' -or $vi.ProductName -ne 'Desktop Switcher') { throw "exe not rebranded: '$($vi.FileDescription)' / '$($vi.ProductName)'" }
-          Get-Content dist\DesktopSwitcher.zip.sha256
+          $out = & dist\EzDesk\EzDesk.exe /ErrorStdOut /validate dist\EzDesk\EzDesk.ahk 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0) { throw "EzDesk.ahk failed validation: $out" }
+          $vi = (Get-Item dist\EzDesk\EzDesk.exe).VersionInfo
+          if ($vi.FileDescription -ne 'EzDesk' -or $vi.ProductName -ne 'EzDesk') { throw "exe not rebranded: '$($vi.FileDescription)' / '$($vi.ProductName)'" }
+          Get-Content dist\EzDesk.zip.sha256
 
       - uses: actions/upload-artifact@v4
         with:
-          name: DesktopSwitcher
-          path: dist/DesktopSwitcher.zip
+          name: EzDesk
+          path: dist/EzDesk.zip
 
       # Microsoft Store package. Unsigned on purpose: the Store signs it on submission,
       # so it's an artifact to upload to Partner Center, not a release download.
@@ -53,8 +53,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: DesktopSwitcher-store-msix
-          path: dist/DesktopSwitcher.msix
+          name: EzDesk-store-msix
+          path: dist/EzDesk.msix
 
       - name: Publish release
         if: github.ref_type == 'tag'
@@ -62,5 +62,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create $env:GITHUB_REF_NAME dist\DesktopSwitcher.zip dist\DesktopSwitcher.zip.sha256 `
-            --title "Desktop Switcher $env:GITHUB_REF_NAME" --notes-file .github\release-notes.md
+          # Same zip under the old name, so links to .../releases/latest/download/DesktopSwitcher.zip keep working
+          Copy-Item dist\EzDesk.zip dist\DesktopSwitcher.zip
+          gh release create $env:GITHUB_REF_NAME dist\EzDesk.zip dist\EzDesk.zip.sha256 dist\DesktopSwitcher.zip `
+            --title "EzDesk $env:GITHUB_REF_NAME" --notes-file .github\release-notes.md

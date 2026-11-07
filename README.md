@@ -1,10 +1,12 @@
 https://github.com/user-attachments/assets/8d6bad23-e635-49c7-9c4d-a6ba07dd905d
 
-**[Get it from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)** · or [download the zip](https://github.com/alxbdn/win11-desktop-switcher/releases/latest/download/DesktopSwitcher.zip)
+**[Get it from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)** · or [download the zip](https://github.com/alxbdn/win11-desktop-switcher/releases/latest/download/EzDesk.zip)
 
-# win11-desktop-switcher
+<img src="brand/ezdesk.svg" width="96" alt="EzDesk icon">
 
-Fast virtual-desktop switching for Windows 11, with a tray icon that shows which desktop you're on. It also runs on Windows 10. Built on [AutoHotkey v2](https://www.autohotkey.com) and [VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor).
+# EzDesk
+
+Fast virtual-desktop switching for Windows 11, with a tray icon that shows which desktop you're on. Formerly called Desktop Switcher. It also runs on Windows 10. Built on [AutoHotkey v2](https://www.autohotkey.com) and [VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor).
 
 ![Tray icons](docs/icons.png)
 
@@ -12,22 +14,22 @@ Fast virtual-desktop switching for Windows 11, with a tray icon that shows which
 
 ### From the Microsoft Store (recommended)
 
-**[Get Desktop Switcher from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)**, click **Get**, then **Open**. It's signed by Microsoft, so there's no warning, and it updates itself.
+**[Get EzDesk from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)**, click **Get**, then **Open**. It's signed by Microsoft, so there's no warning, and it updates itself.
 
 It starts with Windows; you can turn that off in **Settings › Apps › Startup**. No numbered icon near the clock? Click the **^** arrow next to it and drag the icon onto the taskbar.
 
 ### From the zip (no Store, no admin, no console)
 
-1. **[Download DesktopSwitcher.zip](https://github.com/alxbdn/win11-desktop-switcher/releases/latest/download/DesktopSwitcher.zip)**
+1. **[Download EzDesk.zip](https://github.com/alxbdn/win11-desktop-switcher/releases/latest/download/EzDesk.zip)**
 2. Right-click the zip → **Properties** → tick **Unblock** → **OK**
 3. Right-click the zip → **Extract All…** → pick your **Documents** folder → **Extract**
-4. Open the `DesktopSwitcher` folder and double-click **`DesktopSwitcher.exe`**
+4. Open the `EzDesk` folder and double-click **`EzDesk.exe`**
 5. No numbered icon near the clock? Click the **^** arrow next to it and drag the icon onto the taskbar
 6. Right-click the icon → **Start with Windows**, so it starts by itself next time
 
-> **"Windows protected your PC"?** Click **More info** → **Run anyway**. The exe isn't code-signed, so Windows doesn't recognize it. `DesktopSwitcher.exe` is the official AutoHotkey v2 runtime, renamed and given the app's own icon and name, and the zip is built by [GitHub Actions](.github/workflows/release.yml) from the code in this repo. Step 2 usually prevents the warning.
+> **"Windows protected your PC"?** Click **More info** → **Run anyway**. The exe isn't code-signed, so Windows doesn't recognize it. `EzDesk.exe` is the official AutoHotkey v2 runtime, renamed and given the app's own icon and name, and the zip is built by [GitHub Actions](.github/workflows/release.yml) from the code in this repo. Step 2 usually prevents the warning.
 
-Keep the folder where you extracted it: "Start with Windows" points to it. If you move the folder, start `DesktopSwitcher.exe` once from the new place and the shortcut follows.
+Keep the folder where you extracted it: "Start with Windows" points to it. If you move the folder, start `EzDesk.exe` once from the new place and the shortcut follows.
 
 ## Shortcuts
 
@@ -50,7 +52,7 @@ Shortcuts use the physical keys of the number row, so they work on any keyboard 
 
 ## Uninstall
 
-- **Store version:** Settings › Apps › Installed apps → Desktop Switcher → **Uninstall**.
+- **Store version:** Settings › Apps › Installed apps → EzDesk (Desktop Switcher in older versions) → **Uninstall**.
 - **Zip version:** right-click the tray icon → untick **Start with Windows** → **Exit**, then delete the folder.
 
 Don't keep both installed: they'd both react to the same shortcuts.
@@ -59,14 +61,14 @@ Don't keep both installed: they'd both react to the same shortcuts.
 
 Windows won't let a normal program receive keystrokes meant for an admin window. In the simple install, `Alt + 1…9` therefore doesn't work while Task Manager, an installer or an admin terminal is the active window. Scrolling on the taskbar still works.
 
-Admin mode fixes that. It copies the app to `C:\Program Files\DesktopSwitcher\`, makes that folder admin-only for writing, and registers a **Desktop Switcher** scheduled task that starts it at logon with admin rights, with no UAC prompt each time.
+Admin mode fixes that. It copies the app to `C:\Program Files\EzDesk\`, makes that folder admin-only for writing, and registers an **EzDesk** scheduled task that starts it at logon with admin rights, with no UAC prompt each time.
 
 - **From the zip:** double-click `admin\Install admin mode.cmd` (one UAC prompt). Remove it with `admin\Uninstall admin mode.cmd`.
 - **From a clone of this repo:** `powershell -ExecutionPolicy Bypass -File .\admin\install.ps1`. It installs AutoHotkey with winget if needed and downloads the DLL (SHA256-checked).
 
-It also removes the simple install's startup shortcut, so only one copy runs.
+It also removes the simple install's startup shortcut, so only one copy runs. Installing over an admin mode from before the rename (`C:\Program Files\DesktopSwitcher\` and its "Desktop Switcher" task) replaces it.
 
-The folder is locked because the app runs as admin, and so does everything it executes or loads. Otherwise any program running as you could replace one of those files and gain admin rights at your next login. In admin mode, edit `C:\Program Files\DesktopSwitcher\DesktopSwitcher.ahk` from an editor opened as admin, then use **Restart** in the tray menu. Or edit your copy and run the installer again.
+The folder is locked because the app runs as admin, and so does everything it executes or loads. Otherwise any program running as you could replace one of those files and gain admin rights at your next login. In admin mode, edit `C:\Program Files\EzDesk\EzDesk.ahk` from an editor opened as admin, then use **Restart** in the tray menu. Or edit your copy and run the installer again.
 
 ## Build the zip yourself
 
@@ -74,7 +76,7 @@ The folder is locked because the app runs as admin, and so does everything it ex
 powershell -ExecutionPolicy Bypass -File .\build-release.ps1 -Version 1.0.0
 ```
 
-It downloads pinned versions of AutoHotkey and VirtualDesktopAccessor, checks their SHA256, generates the icons with `make-icons.ps1` and writes `dist\DesktopSwitcher.zip`. Pushing a `v*` tag runs the same build on GitHub Actions and publishes the release.
+It downloads pinned versions of AutoHotkey and VirtualDesktopAccessor, checks their SHA256, generates the icons with `make-icons.ps1` and writes `dist\EzDesk.zip`. Pushing a `v*` tag runs the same build on GitHub Actions and publishes the release.
 
 ## Troubleshooting
 

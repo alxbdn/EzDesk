@@ -25,8 +25,10 @@
   </Resources>
 
   <Applications>
-    <!-- DesktopSwitcher.exe is the AutoHotkey v2 runtime; it runs DesktopSwitcher.ahk next to it -->
-    <Application Id="DesktopSwitcher" Executable="DesktopSwitcher.exe" EntryPoint="Windows.FullTrustApplication">
+    <!-- EzDesk.exe is the AutoHotkey v2 runtime; it runs EzDesk.ahk next to it.
+         Id and TaskId keep their pre-rename values: changing them would make Windows treat the update
+         as a different app (lost Start pins, "Start with Windows" reset). Users never see them. -->
+    <Application Id="DesktopSwitcher" Executable="EzDesk.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="{DISPLAY_NAME}"
         Description="Fast virtual-desktop switching for Windows, with a tray icon that shows which desktop you're on."
@@ -35,8 +37,8 @@
         Square44x44Logo="Assets\Square44x44Logo.png" />
       <Extensions>
         <!-- Start with Windows: active once the app has been launched, toggled in Settings > Apps > Startup -->
-        <desktop:Extension Category="windows.startupTask" Executable="DesktopSwitcher.exe" EntryPoint="Windows.FullTrustApplication">
-          <desktop:StartupTask TaskId="DesktopSwitcherStartup" Enabled="true" DisplayName="Desktop Switcher" />
+        <desktop:Extension Category="windows.startupTask" Executable="EzDesk.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="DesktopSwitcherStartup" Enabled="true" DisplayName="EzDesk" />
         </desktop:Extension>
       </Extensions>
     </Application>
