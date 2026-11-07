@@ -4,3 +4,6 @@
 icons/
 *.ico
 dist/
+
+# ...except the app icon, which is a source file
+!brand/ezdesk.ico
