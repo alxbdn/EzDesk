@@ -248,7 +248,13 @@ MakeGo(n) {
     return (*) => GoToDesktop(n)
 }
 MakeMove(n) {
-    return (*) => MoveActiveToDesktop(n)
+    return (*) => (MaskAltShift(), MoveActiveToDesktop(n))
+}
+; Windows switches the keyboard layout when Alt+Shift is pressed and released with no other key
+; in between. The hotkey swallows the number key, so Windows only sees Alt+Shift and cycles the
+; layout. Sending an unassigned key (vkE8) while Alt+Shift are still down cancels that toggle.
+MaskAltShift() {
+    Send("{Blind}{vkE8}")
 }
 ; Bound by physical key (scan codes sc002…sc00A = the 1…9 row), not by character.
 ; "!1" means "Alt + the character 1", and on AZERTY that character needs Shift: "!1" and "!+1"
