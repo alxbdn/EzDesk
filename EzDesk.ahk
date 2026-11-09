@@ -9,7 +9,7 @@ Persistent
 ;    Hold a window still   the dock of desktops opens: drop it on one, or take it into
 ;                          the glowing bump on either side to slide to the next / previous
 ;    Scroll on taskbar     previous / next desktop
-;    Tray icon             shows the current desktop number; click = Task View
+;    Tray icon             shows the current desktop number; click = the dock, to browse desktops
 ; =====================================================================
 ;
 ; Start-up order matters: icon, menu and mouse hooks are set up first, and the

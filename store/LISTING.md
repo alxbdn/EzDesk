@@ -52,7 +52,7 @@ Partner Center asks you to justify it. Paste:
 > • Hold a window by its title bar for a moment: a frosted-glass dock of your desktops rises, each a live miniature. Drop the window on one: it goes there, and you stay where you are. "+" makes a new desktop.
 > • Or bring it into the glowing bump on either side of the screen: you slide to the next or previous desktop with the window in hand.
 > • Scroll on the taskbar: previous / next desktop. Scrolling over the volume icon still changes the volume.
-> • A tray icon shows the current desktop's number. Click it for Task View.
+> • A tray icon shows the current desktop's number. Click it to open the dock: go to a desktop, close one, or make a new one.
 >
 > Organize your work the way you think: one desktop for meetings, one for email and the web, one for code. No shortcuts to learn.
 >

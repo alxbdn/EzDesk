@@ -76,7 +76,7 @@ HOW IT WORKS (mouse only)
   Side bumps            or bring it into the glowing bump on the left / right of the
                         screen to slide to the previous / next desktop with it
   Scroll on taskbar     previous / next desktop
-  Click the icon        Task View
+  Click the icon        the dock: go to a desktop, close one, make a new one
 
 STOP / REMOVE
   Right-click the icon > untick "Start with Windows" > Exit, then delete this folder.
