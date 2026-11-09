@@ -448,12 +448,13 @@ global barBox := {x: 0, y: 0, w: 0, h: 0, mon: 0, gap: 0, edge: 0}
 BarLayout(mon, n) {
     MonitorGet(mon, &ml, &mt, &mr, &mb)
     mw := mr - ml, mh := mb - mt, s := A_ScreenDPI / 96
-    pad := Round(16 * s), gap := Round(16 * s), labelH := Round(24 * s)
-    th := Round(108 * s), tw := Round(th * mw / mh)
+    th := Max(Round(108 * s), Round(mh * 0.15))     ; a sixth or so of the screen's height: big enough to see what's in each
+    pad := Round(th * 0.14), gap := Round(th * 0.14), labelH := Round(th * 0.2)
+    tw := Round(th * mw / mh)
     if (n * tw + (n - 1) * gap + 2 * pad > mw * 0.92)
         tw := Floor((mw * 0.92 - 2 * pad - (n - 1) * gap) / n), th := Round(tw * mh / mw)
     return {ml: ml, mt: mt, mr: mr, mb: mb, pad: pad, gap: gap, labelH: labelH, tw: tw, th: th
-        , bw: n * tw + (n - 1) * gap + 2 * pad, bh: pad + th + labelH + Round(8 * s), s: s}
+        , bw: n * tw + (n - 1) * gap + 2 * pad, bh: pad + th + labelH + Round(th * 0.07), s: s}
 }
 
 ; Opens the dock (intro) or rebuilds it in place after a desktop switch: the new one is built and
@@ -700,7 +701,7 @@ global deckGeom := {x: 0, y: 0, fw: 0, fh: 0, bw: 0, bh: 0, rad: 0, mg: 0}, deck
 global DECK_N := 5                                  ; superellipse exponent: 2 = circle arcs, higher = squarer
 global DECK_GLOW := 14                              ; how far the haze reaches out round the deck, in pixels at 100 %
 
-DeckRadius(lay) => Min(Round(44 * lay.s), lay.bh // 2)
+DeckRadius(lay) => Min(Round(lay.bh * 0.28), lay.bh // 2)   ; grows with the dock
 
 ; The deck's outline as a window region: a rectangle whose corners are superellipse quarters
 ; (|x|^n + |y|^n = rad^n), going round clockwise from the top edge.
@@ -926,7 +927,7 @@ DeckDrawOverlay() {
     s := A_ScreenDPI / 96, rect := Buffer(16)
     for tile in barTiles {
         font := 0, brush := 0
-        DllCall("gdiplus\GdipCreateFont", "Ptr", fam, "Float", 12 * s, "Int", tile.current ? 1 : 0, "Int", 2, "Ptr*", &font)   ; pixels; bold for the current one
+        DllCall("gdiplus\GdipCreateFont", "Ptr", fam, "Float", Max(12 * s, barBox.labelH * 0.5), "Int", tile.current ? 1 : 0, "Int", 2, "Ptr*", &font)   ; pixels; bold for the current one
         DllCall("gdiplus\GdipCreateSolidFill", "UInt", tile.current ? 0xFFFFFFFF : 0xFFB8B8C4, "Ptr*", &brush)
         NumPut("Float", g.mg + tile.x, "Float", g.mg + tile.y + tile.h + 3 * s, "Float", tile.w, "Float", barBox.labelH, rect)
         DllCall("gdiplus\GdipDrawString", "Ptr", gfx, "WStr", tile.name, "Int", -1, "Ptr", font, "Ptr", rect, "Ptr", fmt, "Ptr", brush)
