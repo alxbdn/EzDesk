@@ -1030,6 +1030,22 @@ BumpStrip(period, shift) {
     return cache[key]
 }
 
+BumpPlus() {                                        ; the "+" on the last desktop's bump: dark, opaque, made once
+    static p := 0
+    if !p {
+        s := A_ScreenDPI / 96, size := Round(14 * s), t := Max(2, Round(3 * s)), o := (size - t) // 2
+        dc := NewDib(size, size, &bits)             ; starts transparent
+        Loop t {
+            r := o + A_Index - 1
+            Fill32(bits + r * size * 4, size, 0xFF16171C)              ; the bar across
+            Loop size
+                NumPut("UInt", 0xFF16171C, bits, ((A_Index - 1) * size + r) * 4)   ; the bar down
+        }
+        p := {dc: dc, size: size}
+    }
+    return p
+}
+
 BumpWhite() {                                       ; for the light that fills a bump you hold
     static dc := 0
     if !dc {
@@ -1085,8 +1101,9 @@ BumpFrame() {
             continue
         }
         fill := (edgeSide = side && edgeSince) ? Min(1, (now - edgeSince) / EDGE_HOLD_MS) : 0
+        plus := (side > 0 && cur + 1 >= count) ? Min(1, Max(0, (q - 0.45) / 0.4)) : 0   ; last desktop: this one makes a new one
         BumpDraw(i, side, Round(q / BUMP_QMAX * (BUMP_LEVELS - 1)), fill, alpha
-            , side < 0 ? wl : wr - g.bw, Round(bumpY[i] - g.bh / 2))
+            , side < 0 ? wl : wr - g.bw, Round(bumpY[i] - g.bh / 2), plus, BumpDepth(q))
     }
     if EdgeHeld(contact) {                          ; held long enough: off to that desktop, window in hand
         Send(contact < 0 ? "^#{Left}" : cur + 1 < count ? "^#{Right}" : "^#d")
@@ -1096,7 +1113,7 @@ BumpFrame() {
     }
 }
 
-BumpDraw(i, side, k, fill, alpha, x, y) {
+BumpDraw(i, side, k, fill, alpha, x, y, plus := 0, depth := 0) {
     global bumpVis
     static pinned := false
     g := BumpGeom(), bw := g.bw, bh := g.bh, pa := bh, pb := GlowPeriod2(bh)   ; the whole palette along a bump
@@ -1113,6 +1130,11 @@ BumpDraw(i, side, k, fill, alpha, x, y) {
     DllCall("msimg32\AlphaBlend", "Ptr", canvas, "Int", 0, "Int", 0, "Int", bw, "Int", bh
         , "Ptr", mk.inv, "Int", 0, "Int", 0, "Int", bw, "Int", bh, "UInt", (1 << 24) | (255 << 16))
     DllCall("BitBlt", "Ptr", canvas, "Int", 0, "Int", 0, "Int", bw, "Int", bh, "Ptr", mk.keep, "Int", 0, "Int", 0, "UInt", 0x008800C6)
+    if (plus > 0) {                                 ; a black "+" in the bump's belly: going on makes a new desktop
+        p := BumpPlus(), cx := side > 0 ? bw - depth * 0.55 : depth * 0.55
+        DllCall("msimg32\AlphaBlend", "Ptr", canvas, "Int", Round(cx - p.size / 2), "Int", (bh - p.size) // 2, "Int", p.size, "Int", p.size
+            , "Ptr", p.dc, "Int", 0, "Int", 0, "Int", p.size, "Int", p.size, "UInt", (1 << 24) | (Round(255 * plus) << 16))
+    }
     GlowPut(bumpWin[i], x, y, bw, bh, canvas, Min(255, alpha))
     if !bumpVis[i]
         OnTop(bumpWin[i]), bumpVis[i] := true
@@ -1527,13 +1549,80 @@ UpdateTray(*) {
     }
     if (i = shownIndex && c = shownCount)
         return
-    if (shownIndex >= 0 && i != shownIndex)         ; a real switch, not the first reading
+    switched := shownIndex >= 0 && i != shownIndex  ; a real switch, not the first reading
+    if switched
         SetTimer(OfferTaskbarAllDesktops, -1500)    ; once the slide is over
     shownIndex := i, shownCount := c
     n := i + 1
-    TraySetIcon(A_ScriptDir "\icons\" (n <= 9 ? n : "more") ".ico")
+    icon := A_ScriptDir "\icons\" (n <= 9 ? n : "more") ".ico"
+    TraySetIcon(icon)
+    if switched
+        TrayFlash(icon)
     name := DesktopName(i)
     A_IconTip := "Desktop " n " of " c (name != "" ? " — " name : "")
+}
+
+; A desktop switch lights the number up for a moment: a violet-to-orange rim round it that comes
+; on and fades in about 0.6 s. The frames are drawn once per number and size (GDI+ over the icon)
+; and kept.
+TrayFlash(path) {
+    static frames := Map(), count := 10
+    sz := DllCall("GetSystemMetrics", "Int", 49)     ; SM_CXSMICON: the tray's icon size
+    key := path "|" sz
+    if !frames.Has(key) {
+        list := []
+        Loop count
+            list.Push(TrayFlashFrame(path, sz, Sin(3.14159 * A_Index / (count + 1))))   ; up, then down
+        frames[key] := list
+    }
+    list := frames[key], step := 0
+    Next() {
+        step += 1
+        if (step > list.Length || !list[step]) {
+            SetTimer(Next, 0)
+            TraySetIcon(path)                       ; back to the plain number
+            return
+        }
+        TraySetIcon("HICON:*" list[step])
+    }
+    SetTimer(Next, 60)
+}
+
+; The number's icon with the glow's rim over it, k = 0…1 strong. Returns an icon handle (0 on failure).
+TrayFlashFrame(path, sz, k) {
+    hIcon := LoadPicture(path, "w" sz " h" sz, &kind)
+    if !hIcon
+        return 0
+    bi := Buffer(40, 0)
+    NumPut("UInt", 40, bi, 0), NumPut("Int", sz, bi, 4), NumPut("Int", -sz, bi, 8), NumPut("UShort", 1, bi, 12), NumPut("UShort", 32, bi, 14)
+    bits := 0
+    hbm := DllCall("CreateDIBSection", "Ptr", 0, "Ptr", bi, "UInt", 0, "Ptr*", &bits, "Ptr", 0, "UInt", 0, "Ptr")
+    dc := DllCall("CreateCompatibleDC", "Ptr", 0, "Ptr"), old := DllCall("SelectObject", "Ptr", dc, "Ptr", hbm, "Ptr")
+    DllCall("DrawIconEx", "Ptr", dc, "Int", 0, "Int", 0, "Ptr", hIcon, "Int", sz, "Int", sz, "UInt", 0, "Ptr", 0, "UInt", 3)
+    DllCall("SelectObject", "Ptr", dc, "Ptr", old), DllCall("DeleteDC", "Ptr", dc), DllCall("DestroyIcon", "Ptr", hIcon)
+    GdipStart()
+    bmp := 0, gfx := 0, brush := 0, pen := 0, path2 := 0
+    DllCall("gdiplus\GdipCreateBitmapFromScan0", "Int", sz, "Int", sz, "Int", sz * 4, "Int", 0xE200B, "Ptr", bits, "Ptr*", &bmp)
+    DllCall("gdiplus\GdipGetImageGraphicsContext", "Ptr", bmp, "Ptr*", &gfx)
+    DllCall("gdiplus\GdipSetSmoothingMode", "Ptr", gfx, "Int", 4)
+    a := Round(255 * k) << 24, p1 := Buffer(8), p2 := Buffer(8)
+    NumPut("Float", 0, "Float", 0, p1), NumPut("Float", sz, "Float", sz, p2)
+    DllCall("gdiplus\GdipCreateLineBrush", "Ptr", p1, "Ptr", p2, "UInt", a | 0x6E38E0, "UInt", a | 0xFF5F36, "Int", 0, "Ptr*", &brush)
+    w := Max(1.5, sz / 9), r := sz / 4, x := w / 2, d := 2 * r, e := sz - w
+    DllCall("gdiplus\GdipCreatePen2", "Ptr", brush, "Float", w, "Int", 2, "Ptr*", &pen)
+    DllCall("gdiplus\GdipCreatePath", "Int", 0, "Ptr*", &path2)
+    for arc in [[x, x, 180], [x + e - d, x, 270], [x + e - d, x + e - d, 0], [x, x + e - d, 90]]
+        DllCall("gdiplus\GdipAddPathArc", "Ptr", path2, "Float", arc[1], "Float", arc[2], "Float", d, "Float", d, "Float", arc[3], "Float", 90)
+    DllCall("gdiplus\GdipClosePathFigure", "Ptr", path2)
+    DllCall("gdiplus\GdipDrawPath", "Ptr", gfx, "Ptr", pen, "Ptr", path2)
+    DllCall("gdiplus\GdipDeletePath", "Ptr", path2), DllCall("gdiplus\GdipDeletePen", "Ptr", pen), DllCall("gdiplus\GdipDeleteBrush", "Ptr", brush)
+    DllCall("gdiplus\GdipDeleteGraphics", "Ptr", gfx), DllCall("gdiplus\GdipDisposeImage", "Ptr", bmp)
+    mask := DllCall("CreateBitmap", "Int", sz, "Int", sz, "UInt", 1, "UInt", 1, "Ptr", 0, "Ptr")   ; all-zero mask: the alpha decides
+    ii := Buffer(8 + A_PtrSize * 3, 0)               ; ICONINFO
+    NumPut("Int", 1, ii, 0), NumPut("Ptr", mask, ii, 8 + A_PtrSize), NumPut("Ptr", hbm, ii, 8 + A_PtrSize * 2)
+    h := DllCall("CreateIconIndirect", "Ptr", ii, "Ptr")
+    DllCall("DeleteObject", "Ptr", mask), DllCall("DeleteObject", "Ptr", hbm)
+    return h
 }
 
 ; Welcome tip on the very first launch only. (The Store's startup task can't pass --startup,
