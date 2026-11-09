@@ -522,7 +522,6 @@ BarShow(mon, held, intro := true) {
         try oldBar.Destroy()
     if intro {
         BumpsOpen()
-        SnapPause(true)
         WinGlowShow(held)
     }
     DeckGlowFrame()
@@ -629,7 +628,6 @@ BarHide() {
     deckGlow.Hide()
     BumpsHide()
     WinGlowHide()
-    SnapPause(false)
     SetTimer(BarRefresh, 0)
     bar := 0, barShown := false, barTiles := [], barThumbs := [], barHover := 0
 }
@@ -951,9 +949,10 @@ DeckDrawOverlay() {
 ; ---- The side bumps: where you take the window to the previous / next desktop ----
 ; While the dock is open, a small glowing bump sits on each side of the screen, level with the
 ; cursor (it glides along the edge after it). Bring the window towards a side and that bump swells,
-; smoothly with the distance, from 200 px away. Into the bump (about 20 px from the edge, before
-; Windows' Snap would take over at the edge itself) and hold: it fills with light for 0.75 s, then
-; you slide to that desktop, window in hand, and it gives a little bounce. On desktop 1 there's no
+; smoothly with the distance, from 200 px away. Into the bump (about 20 px from the edge) and hold:
+; it fills with light for 0.75 s, then
+; you slide to that desktop, window in hand, and it gives a little bounce. Windows' Snap still works
+; all along: let go against the edge before the 0.75 s and the window snaps there. On desktop 1 there's no
 ; left bump: nothing that way. Past the last desktop, the right one makes a new desktop.
 ; Shape: a bell, depth × (1 - u²)² across ±half (u = -1…1 along the edge), filled, with the glow's
 ; haze round it. Its size follows q = closeness (+ bounce): BUMP_LEVELS masks, made once.
@@ -1314,26 +1313,6 @@ WinGlowStrip(w, h, period, shift, vertical) {
 
 ; Shows a glow window on top of everything, without activating it.
 OnTop(g) => DllCall("SetWindowPos", "Ptr", g.Hwnd, "Ptr", -1, "Int", 0, "Int", 0, "Int", 0, "Int", 0, "UInt", 0x53)   ; TOPMOST; NOSIZE|NOMOVE|NOACTIVATE|SHOWWINDOW
-
-; Windows' Snap (the half-screen preview when a dragged window nears the edge) is paused while the
-; dock is open, so the bumps have the sides to themselves; it's back on release, and on exit. In
-; memory only (not saved), and left alone if it was already off.
-SnapPause(on) {
-    static paused := false
-    if (on = paused)
-        return
-    if on {
-        cur := 0
-        DllCall("SystemParametersInfo", "UInt", 0x0082, "UInt", 0, "Int*", &cur, "UInt", 0)   ; SPI_GETWINARRANGING
-        if !cur
-            return
-        DllCall("SystemParametersInfo", "UInt", 0x0083, "UInt", 0, "Ptr", 0, "UInt", 0)       ; SPI_SETWINARRANGING off
-    } else {
-        DllCall("SystemParametersInfo", "UInt", 0x0083, "UInt", 1, "Ptr", 1, "UInt", 0)       ; back on
-    }
-    paused := on
-}
-OnExit((*) => SnapPause(false))
 
 SetTimer(WarmBar, -5000)
 

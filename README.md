@@ -50,7 +50,7 @@ Everything is done with the mouse.
 
 **Performance mode** (tray menu): on a slow PC, EzDesk already lightens its animations by itself while the PC is struggling, and goes back to full ones when it recovers. Tick this to keep them light all the time.
 
-While the dock is open, Windows' Snap (the half-screen preview at the screen's edge) is paused, so the side bumps don't fight with it. It's back as soon as you let go.
+Windows' Snap keeps working while the dock is open, on any desktop: let go against the edge before the bump fills (0.75 s) and the window snaps to half the screen as usual.
 
 **Taskbar: show apps from all desktops** (tray menu) turns on Windows' own setting, so the taskbar marks every open app on every desktop, not only the ones on the current desktop. Clicking an app that's on another desktop takes you there. In the Store version, it opens the Settings page (Multitasking › Desktops) where you change it.
 
