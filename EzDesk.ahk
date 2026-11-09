@@ -151,6 +151,7 @@ Step(delta) {
 global SETTINGS := A_AppData "\EzDesk\settings.ini"         ; per-package private copy when packaged
 global holdOn := IniRead(SETTINGS, "EzDesk", "HoldWindow", 1) = 1       ; the dock and its side bumps
 global perfMode := IniRead(SETTINGS, "EzDesk", "Performance", 0) = 1    ; lighter animation, always
+global trayReminder := IniRead(SETTINGS, "EzDesk", "TrayReminder", 1) = 1   ; say so when the tray icon is hidden
 global dragHwnd := 0, edgeSide := 0, edgeSince := 0, dragPinned := false
 
 ; Pins the held window to every desktop, once. Done when the drag starts, not at the switch itself:
@@ -1364,18 +1365,22 @@ ShowAllApps() {
 
 ; A notification that does something when clicked: Windows tells the tray icon (AHK_NOTIFYICON,
 ; 0x404) with NIN_BALLOONUSERCLICK (0x405); the action waits until then, and only for that one.
-global noteAction := 0
-Notify(text, title, action) {
-    global noteAction := action
+global noteAction := 0, noteIgnored := 0
+Notify(text, title, action, ignored := 0) {
+    global noteAction := action, noteIgnored := ignored
     TrayTip(text, title, "Mute")
 }
 NotifyClicked(wParam, lParam, *) {
-    global noteAction
-    if ((lParam & 0xFFFF) = 0x405 && noteAction) {
-        act := noteAction, noteAction := 0
+    global noteAction, noteIgnored
+    msg := lParam & 0xFFFF
+    if (msg = 0x405 && noteAction) {                ; NIN_BALLOONUSERCLICK
+        act := noteAction, noteAction := 0, noteIgnored := 0
         SetTimer(act, -1)                           ; out of the message handler first
-    } else if ((lParam & 0xFFFF) = 0x404)           ; NIN_BALLOONTIMEOUT: closed without a click
-        noteAction := 0
+    } else if (msg = 0x404 && noteAction) {         ; NIN_BALLOONTIMEOUT: closed or gone without a click
+        ign := noteIgnored, noteAction := 0, noteIgnored := 0
+        if ign
+            SetTimer(ign, -1)
+    }
 }
 OnMessage(0x404, NotifyClicked)
 
@@ -1428,6 +1433,9 @@ if holdOn
 A_TrayMenu.Add("Performance mode (lighter animations)", TogglePerf)
 if perfMode
     A_TrayMenu.Check("Performance mode (lighter animations)")
+A_TrayMenu.Add("Remind me when this icon is hidden", ToggleTrayReminder)
+if trayReminder
+    A_TrayMenu.Check("Remind me when this icon is hidden")
 if PACKAGED {
     A_TrayMenu.Add("Taskbar: show apps from all desktops…", (*) => Run("ms-settings:multitasking"))
 } else {
@@ -1549,13 +1557,30 @@ else
 
 ; Windows decides whether a tray icon is shown or hidden under ^, and apps can't change it. If it's
 ; hidden, a notification says so; clicked, it opens the Settings page where it's one switch to turn on.
+; Never nagging: it stops for good when "Remind me when this icon is hidden" is unticked in the
+; tray menu, or after three reminders in a row closed or left without a click.
 CheckTrayIcon() {
-    if (TrayIconShown() = 0)
-        Notify("Your desktop number is hidden under ^ next to the clock. Click here to keep it in view."
-            , "Show EzDesk next to the clock", ShowTrayIcon)
+    if (!trayReminder || IniRead(SETTINGS, "EzDesk", "TrayIgnored", 0) >= 3 || TrayIconShown() != 0)
+        return
+    Notify("Your desktop number is hidden under ^ next to the clock. Click here to keep it in view."
+        , "Show EzDesk next to the clock", ShowTrayIcon, TrayReminderIgnored)
+}
+
+TrayReminderIgnored() {
+    try {
+        DirCreate(A_AppData "\EzDesk")
+        IniWrite(IniRead(SETTINGS, "EzDesk", "TrayIgnored", 0) + 1, SETTINGS, "EzDesk", "TrayIgnored")
+    }
+}
+
+ToggleTrayReminder(itemName, *) {
+    global trayReminder := !trayReminder
+    SaveSetting("TrayReminder", trayReminder, itemName)
+    try IniWrite(0, SETTINGS, "EzDesk", "TrayIgnored")   ; ticked again: a fresh start
 }
 
 ShowTrayIcon() {
+    try IniWrite(0, SETTINGS, "EzDesk", "TrayIgnored")
     OpenTrayIconSettings()
     TrayTip(WIN_BUILD >= 22000
         ? "Open Other system tray icons in the window that just opened, and turn on EzDesk."
