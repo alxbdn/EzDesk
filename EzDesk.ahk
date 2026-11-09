@@ -448,7 +448,7 @@ global barBox := {x: 0, y: 0, w: 0, h: 0, mon: 0, gap: 0, edge: 0}
 BarLayout(mon, n) {
     MonitorGet(mon, &ml, &mt, &mr, &mb)
     mw := mr - ml, mh := mb - mt, s := A_ScreenDPI / 96
-    th := Max(Round(108 * s), Round(mh * 0.15))     ; a sixth or so of the screen's height: big enough to see what's in each
+    th := Max(Round(108 * s), Round(mh * 0.11))     ; about a ninth of the screen's height: big enough to see what's in each
     pad := Round(th * 0.14), gap := Round(th * 0.14), labelH := Round(th * 0.2)
     tw := Round(th * mw / mh)
     if (n * tw + (n - 1) * gap + 2 * pad > mw * 0.92)
