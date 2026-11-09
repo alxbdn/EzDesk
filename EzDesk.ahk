@@ -1327,13 +1327,57 @@ global EXPLORER_ADV := "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\
 
 TaskbarAllDesktops() => RegRead(EXPLORER_ADV, "VirtualDesktopTaskbarFilter", 1) = 0
 
-ToggleTaskbarAllDesktops(itemName, *) {
-    on := !TaskbarAllDesktops()
+global TASKBAR_ITEM := "Taskbar: show apps from all desktops"
+
+ToggleTaskbarAllDesktops(itemName, *) => SetTaskbarAllDesktops(!TaskbarAllDesktops())
+
+SetTaskbarAllDesktops(on) {
     RegWrite(on ? 0 : 1, "REG_DWORD", EXPLORER_ADV, "VirtualDesktopTaskbarFilter")
     DllCall("SendMessageTimeout", "Ptr", 0xFFFF, "UInt", 0x1A, "Ptr", 0, "Str", "TraySettings"
         , "UInt", 2, "UInt", 1000, "Ptr*", 0)       ; WM_SETTINGCHANGE: the taskbar re-reads it
-    TaskbarAllDesktops() ? A_TrayMenu.Check(itemName) : A_TrayMenu.Uncheck(itemName)
+    try TaskbarAllDesktops() ? A_TrayMenu.Check(TASKBAR_ITEM) : A_TrayMenu.Uncheck(TASKBAR_ITEM)
 }
+
+; The first time you switch desktops while the taskbar only shows the current desktop's apps, a
+; notification offers to show them all (once, ever). Clicked: the zip and admin versions turn
+; Windows' setting on right away; the Store version opens its Settings page.
+OfferTaskbarAllDesktops() {
+    if TaskbarAllDesktops() || IniRead(SETTINGS, "EzDesk", "TaskbarOffered", 0)
+        return
+    try {
+        DirCreate(A_AppData "\EzDesk")
+        IniWrite(1, SETTINGS, "EzDesk", "TaskbarOffered")
+    }
+    Notify("Apps open on your other desktops don't show on the taskbar. Click here to see them all, wherever you are."
+        , "See all your apps on the taskbar", ShowAllApps)
+}
+
+ShowAllApps() {
+    if PACKAGED {
+        Run("ms-settings:multitasking")
+        TrayTip('Under Desktops, set "On the taskbar, show all the open windows" to "On all desktops".', "One switch to change", "Mute")
+    } else {
+        SetTaskbarAllDesktops(true)
+        TrayTip("The taskbar now shows the apps of every desktop. Clicking one takes you to its desktop.", "Done", "Mute")
+    }
+}
+
+; A notification that does something when clicked: Windows tells the tray icon (AHK_NOTIFYICON,
+; 0x404) with NIN_BALLOONUSERCLICK (0x405); the action waits until then, and only for that one.
+global noteAction := 0
+Notify(text, title, action) {
+    global noteAction := action
+    TrayTip(text, title, "Mute")
+}
+NotifyClicked(wParam, lParam, *) {
+    global noteAction
+    if ((lParam & 0xFFFF) = 0x405 && noteAction) {
+        act := noteAction, noteAction := 0
+        SetTimer(act, -1)                           ; out of the message handler first
+    } else if ((lParam & 0xFFFF) = 0x404)           ; NIN_BALLOONTIMEOUT: closed without a click
+        noteAction := 0
+}
+OnMessage(0x404, NotifyClicked)
 
 ; ---------------------------------------------------------------------
 ;  Tray menu and "Start with Windows"
@@ -1475,6 +1519,8 @@ UpdateTray(*) {
     }
     if (i = shownIndex && c = shownCount)
         return
+    if (shownIndex >= 0 && i != shownIndex)         ; a real switch, not the first reading
+        SetTimer(OfferTaskbarAllDesktops, -1500)    ; once the slide is over
     shownIndex := i, shownCount := c
     n := i + 1
     TraySetIcon(A_ScriptDir "\icons\" (n <= 9 ? n : "more") ".ico")
@@ -1494,20 +1540,34 @@ FirstRun() {
     }
     return true
 }
-if !STARTED_AT_LOGIN && FirstRun()
-    SetTimer(Welcome, -3000)                        ; give Windows time to place the new tray icon
+; Every start checks that the desktop number is on the taskbar (the very first one with the welcome
+; tip); a few seconds in, so Windows has placed the icon.
+if (!STARTED_AT_LOGIN && FirstRun())
+    SetTimer(Welcome, -3000)
+else
+    SetTimer(CheckTrayIcon, -8000)
 
-; Windows decides whether a new tray icon is shown or hidden under ^, and apps can't change it.
-; If it's hidden, the welcome tip opens the Settings page where it's one switch to turn on.
+; Windows decides whether a tray icon is shown or hidden under ^, and apps can't change it. If it's
+; hidden, a notification says so; clicked, it opens the Settings page where it's one switch to turn on.
+CheckTrayIcon() {
+    if (TrayIconShown() = 0)
+        Notify("Your desktop number is hidden under ^ next to the clock. Click here to keep it in view."
+            , "Show EzDesk next to the clock", ShowTrayIcon)
+}
+
+ShowTrayIcon() {
+    OpenTrayIconSettings()
+    TrayTip(WIN_BUILD >= 22000
+        ? "Open Other system tray icons in the window that just opened, and turn on EzDesk."
+        : "Turn on EzDesk in the window that just opened."
+        , "One switch to turn on", "Mute")
+}
+
 ; Plain words and one concrete example, no shortcut notation: people read a toast in two seconds.
 Welcome() {
     shown := TrayIconShown()
     if (shown = 0) {                                ; the one thing that matters first: see the number
-        OpenTrayIconSettings()
-        TrayTip(WIN_BUILD >= 22000
-            ? "Open Other system tray icons in the window that just opened, and turn on EzDesk. Your desktop number will show next to the clock."
-            : "Turn on EzDesk in the window that just opened. Your desktop number will show next to the clock."
-            , "One last step", "Mute")
+        CheckTrayIcon()
         return
     }
     tip := "Hold a window by its title bar for a moment: drop it on the desktop you want."

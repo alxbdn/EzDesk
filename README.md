@@ -52,6 +52,8 @@ Everything is done with the mouse.
 
 Windows' Snap keeps working while the dock is open, on any desktop: let go against the edge before the bump fills (0.75 s) and the window snaps to half the screen as usual.
 
+The first time you switch desktops while the taskbar only shows the current desktop's apps, EzDesk offers, in a notification, to show them all: click it and it's done (the Store version opens the Settings page where it's one switch).
+
 **Taskbar: show apps from all desktops** (tray menu) turns on Windows' own setting, so the taskbar marks every open app on every desktop, not only the ones on the current desktop. Clicking an app that's on another desktop takes you there. In the Store version, it opens the Settings page (Multitasking › Desktops) where you change it.
 
 EzDesk 1.3 dropped the keyboard shortcuts of earlier versions (`Alt + 1…9`, `Alt + Shift + 1…9`): it's mouse-first now.
@@ -88,7 +90,7 @@ It downloads pinned versions of AutoHotkey and VirtualDesktopAccessor, checks th
 
 - **"DLL may not match this Windows build" after a Windows update:** VirtualDesktopAccessor relies on undocumented Windows internals that sometimes change between builds. Check its [releases](https://github.com/Ciantic/VirtualDesktopAccessor/releases) for a newer DLL. Update the URL and SHA256 in `build-release.ps1` and `admin\install.ps1`.
 - **Tooltip says "waiting for Windows virtual desktops":** Windows isn't answering yet, which is normal for a few seconds after login. If it stays that way, use **Restart** from the icon's menu. Before v1.0.1, this showed as a green "H" icon that couldn't be closed.
-- **Can't find it after double-clicking:** it's running, but Windows put the icon under the `^` arrow next to the clock. Windows doesn't let apps show their own icon, so on the first launch EzDesk opens the Settings page where you turn it on (Windows 11: Taskbar › Other system tray icons). You can also drag it out of `^` onto the taskbar. Double-clicking the exe again just restarts it.
+- **Can't find it after double-clicking:** it's running, but Windows put the icon under the `^` arrow next to the clock. Windows doesn't let apps show their own icon, so each time it starts, if the icon is hidden, EzDesk says so in a notification: click it to open the Settings page where you turn it on (Windows 11: Taskbar › Other system tray icons). You can also drag it out of `^` onto the taskbar. Double-clicking the exe again just restarts it.
 Tested on Windows 11 26H2 (build 26300).
 
 ## License
