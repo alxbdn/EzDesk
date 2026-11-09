@@ -1673,7 +1673,7 @@ UpdateTray(*) {
     A_IconTip := "Desktop " n " of " c (name != "" ? " — " name : "")
 }
 
-; A desktop switch lights the number up for a moment: a violet rim round it that pulses on and
+; A desktop switch lights the number up for a moment: a red-orange rim round it that pulses on and
 ; off in about 0.6 s. The frames are drawn once per number and size (GDI+ over the icon)
 ; and kept.
 TrayFlash(path) {
@@ -1718,7 +1718,7 @@ TrayFlashFrame(path, sz, k) {
     DllCall("gdiplus\GdipSetSmoothingMode", "Ptr", gfx, "Int", 4)
     a := Round(255 * k) << 24, p1 := Buffer(8), p2 := Buffer(8)
     NumPut("Float", 0, "Float", 0, p1), NumPut("Float", sz, "Float", sz, p2)
-    DllCall("gdiplus\GdipCreateSolidFill", "UInt", a | 0xA982FF, "Ptr*", &brush)   ; a violet pulse
+    DllCall("gdiplus\GdipCreateSolidFill", "UInt", a | 0xFF5F36, "Ptr*", &brush)   ; a red-orange pulse
     w := Max(1.5, sz / 9), r := sz / 4, x := w / 2, d := 2 * r, e := sz - w
     DllCall("gdiplus\GdipCreatePen2", "Ptr", brush, "Float", w, "Int", 2, "Ptr*", &pen)
     DllCall("gdiplus\GdipCreatePath", "Int", 0, "Ptr*", &path2)
