@@ -45,7 +45,7 @@ Everything is done with the mouse.
 | Drop it anywhere else | An ordinary move; the dock goes away |
 | Scroll on the taskbar | Previous / next desktop |
 | Scroll on the tray (volume, clock…) | Normal Windows behavior, volume still works |
-| Click the tray icon | Task View |
+| Click the tray icon (the desktop number) | Opens the dock without a window in hand: click a desktop to go there, its **×** to close it (Windows 11), **+** to make one; grab any window by its title bar and it glows at once, drop it on a desktop to send it there. Click anywhere else, or the number again, to close the dock. Task View is in the icon's menu |
 | Right-click the tray icon | Hold a window to move it between desktops, Performance mode, show apps from all desktops on the taskbar, Start with Windows, Help, Restart, Exit |
 
 **Performance mode** (tray menu): on a slow PC, EzDesk already lightens its animations by itself while the PC is struggling, and goes back to full ones when it recovers. Tick this to keep them light all the time.

@@ -51,6 +51,7 @@ global pCreate  := Proc("CreateDesktop", false)     ; Windows 11 build only (Win
 global pPin     := Proc("PinWindow", false)         ; drag to the screen edge needs these two
 global pUnpin   := Proc("UnPinWindow", false)
 global pWinDesk := Proc("GetWindowDesktopNumber", false)   ; the desktop bar's miniatures need it
+global pRemove  := Proc("RemoveDesktop", false)     ; Windows 11 build only: closing a desktop from the dock
 
 ; Every call into the DLL goes through VdaCall(). A DLL that doesn't match this Windows build crashes
 ; (access violation 0xC0000005) instead of returning an error. Without this, AutoHotkey shows an
@@ -376,25 +377,41 @@ global pressHwnd := 0
 Hotkey("~*LButton", PressStart)                     ; ~: the click goes through untouched
 
 PressStart(*) {
-    global pressHwnd, stillX, stillY, stillSince, dragFrom
-    if (!holdOn || !pWinDesk || !pPin || !pUnpin || dragHwnd || pressHwnd || barShown)
+    global pressHwnd, stillX, stillY, stillSince, dragFrom, barHeld
+    if (!holdOn || !pWinDesk || !pPin || !pUnpin || dragHwnd || pressHwnd || (barShown && !browseOn))
         return
     CoordMode("Mouse", "Screen")
     MouseGetPos(&x, &y, &under)
+    if (browseOn && x >= barBox.x && x < barBox.x + barBox.w && y >= barBox.y && y < barBox.y + barBox.h)
+        return                                      ; on the dock: its tiles take the click
     hwnd := under ? DllCall("GetAncestor", "Ptr", under, "UInt", 2, "Ptr") : 0   ; GA_ROOT: the top-level window
-    if (!hwnd || !IsRealWindow(hwnd))
+    hit := 0
+    if (hwnd && IsRealWindow(hwnd))
+        try hit := SendMessage(0x84, 0, ((y & 0xFFFF) << 16) | (x & 0xFFFF), , hwnd, , , , 200)   ; WM_NCHITTEST
+    if (hit != 2) {                                 ; not a title bar (HTCAPTION)
+        if browseOn && !OnTaskbar(hwnd)             ; browsing, clicked elsewhere: close (the tray icon toggles it itself)
+            SetTimer(BarHide, -1)
         return
-    try hit := SendMessage(0x84, 0, ((y & 0xFFFF) << 16) | (x & 0xFFFF), , hwnd, , , , 200)   ; WM_NCHITTEST
-    catch
-        return
-    if (hit != 2)                                   ; HTCAPTION
-        return
+    }
     pressHwnd := hwnd, stillX := x, stillY := y, stillSince := A_TickCount
+    if browseOn                                     ; browsing: it glows at once, ready to drop on a desktop
+        barHeld := hwnd, WinGlowShow(hwnd)
     try {
         WinGetPos(&fx, &fy, &fw, &fh, hwnd)
         dragFrom := {max: WinGetMinMax(hwnd) = 1, x: fx, y: fy, w: fw, h: fh}
     }
     SetTimer(WatchPress, 15)
+}
+
+; The taskbar and its tray (where the icon is), including the overflow under ^.
+OnTaskbar(hwnd) {
+    if !hwnd
+        return false
+    try cls := WinGetClass(hwnd)
+    catch
+        return false
+    return cls = "Shell_TrayWnd" || cls = "Shell_SecondaryTrayWnd" || cls = "NotifyIconOverflowWindow"
+        || cls = "TopLevelWindowForOverflowXamlIsland"
 }
 
 WatchPress() {
@@ -405,7 +422,10 @@ WatchPress() {
     }
     if !GetKeyState("LButton", "P") {               ; let go without ever moving: nothing to drop
         SetTimer(WatchPress, 0), pressHwnd := 0
-        BarHide()
+        if browseOn
+            WinGlowHide()                           ; browsing: the dock stays, only that window lets go
+        else
+            BarHide()
         return
     }
     if (HeldStill() && !barShown)
@@ -429,6 +449,77 @@ WatchPress() {
 global BAR_HOLD_MS := 750
 global bar := 0, barShown := false, barTiles := [], barThumbs := [], barHover := 0, barHeld := 0
 global barBase := {x: 0, y: 0}
+
+; ---- Browsing: the dock opened by clicking the tray number, with no window in hand ----
+; Click a desktop to go there, its × (top right, on hover) to close it, + to make one. Grab a window
+; by its title bar and it glows at once: drop it on a desktop to send it there. Clicking anywhere
+; else, or the number again, closes the dock.
+global browseOn := false
+
+ToggleBrowse(*) {
+    global browseOn
+    if barShown {
+        BarHide()
+        return
+    }
+    CoordMode("Mouse", "Screen")
+    MouseGetPos(&x, &y)
+    m := MonitorAt(x, y)
+    BarShow(m ? m : MonitorGetPrimary(), 0)
+    if barShown {
+        browseOn := true
+        DeckDrawOverlay()                           ; with the × now
+        SetTimer(WatchBrowse, 15)
+    }
+}
+
+WatchBrowse() {
+    if !browseOn || !barShown {
+        SetTimer(WatchBrowse, 0)
+        return
+    }
+    if (dragHwnd || pressHwnd)                      ; a window in hand: its own watcher draws the dock
+        return
+    BarTrack()
+}
+
+; The tile size of the close button's corner, and whether (x, y) is in it.
+CloseHit(tile, x, y) {
+    if (!pRemove || tile.target < 0 || DesktopCount() < 2)
+        return false
+    c := Round(22 * A_ScreenDPI / 96)
+    lx := x - barBox.x - tile.x, ly := y - barBox.y - tile.y
+    return lx >= tile.w - c && lx < tile.w && ly >= 0 && ly < c
+}
+
+BrowseClick(idx, *) {
+    if !browseOn || idx > barTiles.Length
+        return
+    tile := barTiles[idx]
+    CoordMode("Mouse", "Screen")
+    MouseGetPos(&x, &y)
+    if CloseHit(tile, x, y) {                       ; ×: close that desktop (its windows go to a neighbour)
+        VdaCall(pRemove, "Int", tile.target, "Int", tile.target > 0 ? tile.target - 1 : 1, "Int")
+        SetTimer(BarRefresh, -350)
+        return
+    }
+    target := tile.target
+    BarHide()
+    if (target = -2)                                ; +: a new desktop, then there
+        target := NewDesktop(DesktopCount())
+    GoToSliding(target)
+}
+
+; Goes to desktop target with Windows' own slide, one desktop at a time.
+GoToSliding(target) {
+    cur := CurrentDesktop()
+    if (target < 0 || cur < 0 || target = cur)
+        return
+    Loop Abs(target - cur) {
+        Send(target > cur ? "^#{Right}" : "^#{Left}")
+        Sleep(180)
+    }
+}
 
 ; ---- Motion: the dock rises into place when it opens, with a little spring ----
 global DECK_RISE := 40                              ; from how far below, in pixels at 100 %
@@ -463,6 +554,11 @@ BarLayout(mon, n) {
 BarShow(mon, held, intro := true) {
     global bar, barShown, barTiles, barThumbs, barHover, barBox, deckGeom, deckShownAt, barHeld
     global barBase, deckRise
+    ; Uninterruptible: building the dock takes a moment (glass, wallpapers, miniatures), and a timer or
+    ; a drag ending must not run in the middle of it (two docks stacked, or one torn down mid-build).
+    Critical
+    if (intro && barShown)
+        return
     count := DesktopCount(), cur := CurrentDesktop()
     if (count <= 0 || cur < 0)
         return
@@ -505,6 +601,7 @@ BarShow(mon, held, intro := true) {
                 name := "Desktop " (i + 1)
         }
         barTiles.Push({x: x, y: pad, w: tw, h: th, target: isNew ? -2 : i, name: name, current: i = cur, ctl: ctl})   ; names: drawn by DeckDrawOverlay
+        ctl.OnEvent("Click", BrowseClick.Bind(A_Index))   ; when browsing: go there, or close it
     }
     bar.Show("Hide x" sx " y" sy " w" lay.bw " h" lay.bh)           ; sized, shaped, then shown
     DllCall("SetWindowRgn", "Ptr", bar.Hwnd, "Ptr", DeckRegion(lay.bw, lay.bh, rad), "Int", false)   ; Windows owns the region now
@@ -620,7 +717,9 @@ BarTrack() {
 BarTarget() => barShown && barHover ? barTiles[barHover].target : -1
 
 BarHide() {
-    global bar, barShown, barTiles, barThumbs, barHover
+    global bar, barShown, barTiles, barThumbs, barHover, browseOn
+    Critical
+    browseOn := false
     if !barShown
         return
     for thumb in barThumbs
@@ -942,6 +1041,17 @@ DeckDrawOverlay() {
         DllCall("gdiplus\GdipClosePathFigure", "Ptr", path)
         DllCall("gdiplus\GdipDrawPath", "Ptr", gfx, "Ptr", pen, "Ptr", path)
         DllCall("gdiplus\GdipDeletePath", "Ptr", path), DllCall("gdiplus\GdipDeletePen", "Ptr", pen)
+        if (browseOn && pRemove && tile.target >= 0 && barTiles.Length > (pCreate ? 2 : 1)) {   ; browsing: × to close it
+            c := 22 * s, cx := g.mg + tile.x + tile.w - c / 2 - 3 * s, cy := g.mg + tile.y + c / 2 + 3 * s, rr := 8 * s
+            dot := 0, xp := 0
+            DllCall("gdiplus\GdipCreateSolidFill", "UInt", 0xE616171C, "Ptr*", &dot)
+            DllCall("gdiplus\GdipFillEllipse", "Ptr", gfx, "Ptr", dot, "Float", cx - rr, "Float", cy - rr, "Float", 2 * rr, "Float", 2 * rr)
+            DllCall("gdiplus\GdipCreatePen1", "UInt", 0xFFFFFFFF, "Float", 1.6 * s, "Int", 2, "Ptr*", &xp)
+            k := 3.2 * s
+            DllCall("gdiplus\GdipDrawLine", "Ptr", gfx, "Ptr", xp, "Float", cx - k, "Float", cy - k, "Float", cx + k, "Float", cy + k)
+            DllCall("gdiplus\GdipDrawLine", "Ptr", gfx, "Ptr", xp, "Float", cx + k, "Float", cy - k, "Float", cx - k, "Float", cy + k)
+            DllCall("gdiplus\GdipDeletePen", "Ptr", xp), DllCall("gdiplus\GdipDeleteBrush", "Ptr", dot)
+        }
     }
     DllCall("gdiplus\GdipDeleteStringFormat", "Ptr", fmt), DllCall("gdiplus\GdipDeleteFontFamily", "Ptr", fam)
     DllCall("gdiplus\GdipDeleteGraphics", "Ptr", gfx), DllCall("gdiplus\GdipDisposeImage", "Ptr", bmp)
@@ -1033,7 +1143,7 @@ BumpStrip(period, shift) {
 BumpPlus() {                                        ; the "+" on the last desktop's bump: dark, opaque, made once
     static p := 0
     if !p {
-        s := A_ScreenDPI / 96, size := Round(14 * s), t := Max(2, Round(3 * s)), o := (size - t) // 2
+        s := A_ScreenDPI / 96, size := Round(12 * s), t := Max(1, Round(1.6 * s)), o := (size - t) // 2   ; a thin +
         dc := NewDib(size, size, &bits)             ; starts transparent
         Loop t {
             r := o + A_Index - 1
@@ -1447,6 +1557,7 @@ if !PACKAGED && !A_IsAdmin && FileExist(OLD_STARTUP_LNK) {
 }
 
 A_TrayMenu.Delete()
+A_TrayMenu.Add("Show desktops", ToggleBrowse)
 A_TrayMenu.Add("Task View", (*) => Send("#{Tab}"))
 A_TrayMenu.Add()
 A_TrayMenu.Add("Hold a window to move it between desktops", ToggleHold)
@@ -1483,8 +1594,8 @@ A_TrayMenu.Add("Help", (*) => Run("https://github.com/alxbdn/ezdesk#readme"))
 A_TrayMenu.Add()
 A_TrayMenu.Add("Restart", (*) => Reload())
 A_TrayMenu.Add("Exit", (*) => ExitApp())
-A_TrayMenu.Default := "Task View"
-A_TrayMenu.ClickCount := 1                          ; single left-click opens Task View
+A_TrayMenu.Default := "Show desktops"
+A_TrayMenu.ClickCount := 1                          ; single left-click on the number opens the dock
 
 ; ---------------------------------------------------------------------
 ;  Mouse: scroll on the taskbar (registered before any call into the DLL)
@@ -1562,8 +1673,8 @@ UpdateTray(*) {
     A_IconTip := "Desktop " n " of " c (name != "" ? " — " name : "")
 }
 
-; A desktop switch lights the number up for a moment: a violet-to-orange rim round it that comes
-; on and fades in about 0.6 s. The frames are drawn once per number and size (GDI+ over the icon)
+; A desktop switch lights the number up for a moment: a violet rim round it that pulses on and
+; off in about 0.6 s. The frames are drawn once per number and size (GDI+ over the icon)
 ; and kept.
 TrayFlash(path) {
     static frames := Map(), count := 10
@@ -1607,7 +1718,7 @@ TrayFlashFrame(path, sz, k) {
     DllCall("gdiplus\GdipSetSmoothingMode", "Ptr", gfx, "Int", 4)
     a := Round(255 * k) << 24, p1 := Buffer(8), p2 := Buffer(8)
     NumPut("Float", 0, "Float", 0, p1), NumPut("Float", sz, "Float", sz, p2)
-    DllCall("gdiplus\GdipCreateLineBrush", "Ptr", p1, "Ptr", p2, "UInt", a | 0x6E38E0, "UInt", a | 0xFF5F36, "Int", 0, "Ptr*", &brush)
+    DllCall("gdiplus\GdipCreateSolidFill", "UInt", a | 0xA982FF, "Ptr*", &brush)   ; a violet pulse
     w := Max(1.5, sz / 9), r := sz / 4, x := w / 2, d := 2 * r, e := sz - w
     DllCall("gdiplus\GdipCreatePen2", "Ptr", brush, "Float", w, "Int", 2, "Ptr*", &pen)
     DllCall("gdiplus\GdipCreatePath", "Int", 0, "Ptr*", &path2)

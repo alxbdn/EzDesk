@@ -1,9 +1,9 @@
 ﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="1024" height="1024">
-  <!-- EzDesk app icon, V26 "Screen Glow": Desky on the violet-to-orange squircle, its screen ringed with the dock's glow -->
+  <!-- EzDesk app icon, V27 "Dock": Desky over a little dock of desktops, its screen ringed with the glow, on the Aurora tile -->
   <defs>
-    <linearGradient id="ember" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#6E38E0"/>
-      <stop offset="1" stop-color="#FF5F36"/>
+    <linearGradient id="aurora" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2BD9A0"/>
+      <stop offset="1" stop-color="#2F6BFF"/>
     </linearGradient>
     <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#BC82F3"/><stop offset="0.2" stop-color="#F5B9EA"/><stop offset="0.4" stop-color="#8D9FFF"/>
@@ -11,15 +11,17 @@
     </linearGradient>
     <filter id="haze" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.2"/></filter>
   </defs>
-  <path d="M65.00 5.00 L78.29 5.10 L82.47 5.41 L85.43 5.94 L87.74 6.68 L89.60 7.65 L91.12 8.88 L92.35 10.40 L93.32 12.26 L94.06 14.57 L94.59 17.53 L94.90 21.71 L95.00 35.00 L95.00 65.00 L94.90 78.29 L94.59 82.47 L94.06 85.43 L93.32 87.74 L92.35 89.60 L91.12 91.12 L89.60 92.35 L87.74 93.32 L85.43 94.06 L82.47 94.59 L78.29 94.90 L65.00 95.00 L35.00 95.00 L21.71 94.90 L17.53 94.59 L14.57 94.06 L12.26 93.32 L10.40 92.35 L8.88 91.12 L7.65 89.60 L6.68 87.74 L5.94 85.43 L5.41 82.47 L5.10 78.29 L5.00 65.00 L5.00 35.00 L5.10 21.71 L5.41 17.53 L5.94 14.57 L6.68 12.26 L7.65 10.40 L8.88 8.88 L10.40 7.65 L12.26 6.68 L14.57 5.94 L17.53 5.41 L21.71 5.10 L35.00 5.00 Z" fill="url(#ember)"/>
-  <rect x="18" y="22" width="64" height="46" rx="12" fill="none" stroke="url(#glow)" stroke-width="5" filter="url(#haze)"/>
-  <rect x="18" y="22" width="64" height="46" rx="12" fill="#121318"/>
-  <rect x="45" y="67" width="10" height="10" fill="#121318"/>
-  <rect x="34" y="76" width="32" height="7" rx="3.5" fill="#121318"/>
-  <rect x="18" y="22" width="64" height="46" rx="12" fill="none" stroke="url(#glow)" stroke-width="1.6"/>
+  <rect x="5" y="5" width="90" height="90" rx="22" fill="url(#aurora)"/>
+  <rect x="18" y="16" width="64" height="46" rx="12" fill="none" stroke="url(#glow)" stroke-width="5" filter="url(#haze)"/>
+  <rect x="18" y="16" width="64" height="46" rx="12" fill="#121318"/>
+  <rect x="18" y="16" width="64" height="46" rx="12" fill="none" stroke="url(#glow)" stroke-width="1.6"/>
   <g fill="none" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M32.5 44 H45.5 A6.5 6.5 0 1 0 43.6 48.6" stroke="#FFFFFF"/>
-    <path d="M54 37.5 H66 L54 50.5 H66" stroke="#00B85E"/>
-    <path d="M44 59 Q50 63 56 59" stroke="#FFFFFF"/>
+    <path d="M32.5 38 H45.5 A6.5 6.5 0 1 0 43.6 42.6" stroke="#FFFFFF"/>
+    <path d="M54 31.5 H66 L54 44.5 H66" stroke="#00B85E"/>
+    <path d="M44 53 Q50 57 56 53" stroke="#FFFFFF"/>
   </g>
+  <rect x="20" y="70" width="60" height="16" rx="7" fill="#121318"/>
+  <rect x="25" y="74" width="14" height="8" rx="2" fill="#FFFFFF" opacity=".9"/>
+  <rect x="43" y="74" width="14" height="8" rx="2" fill="#00B85E"/>
+  <rect x="61" y="74" width="14" height="8" rx="2" fill="#FFFFFF" opacity=".35"/>
 </svg>
