@@ -438,11 +438,11 @@ WatchPress() {
 ; windows, drawn by Windows itself (DWM thumbnails). On Windows 11 a "+" makes a new desktop. Drop
 ; the window on one: it goes there, back where you picked it up, and you stay where you are.
 ; Dropped anywhere else, it's an ordinary drop and the bar goes away.
-; The bar is Windows' own frosted glass (acrylic) with Windows 11's rounded corners, the glow's light
+; The bar is a dark panel with well-rounded corners, the glow's light
 ; flowing all round it for as long as it's open.
 global BAR_HOLD_MS := 300                           ; held this long, moving or not: the dock opens
 global bar := 0, barShown := false, barTiles := [], barThumbs := [], barHover := 0, barHeld := 0
-global barBase := {x: 0, y: 0}, tilesWin := 0
+global barBase := {x: 0, y: 0}
 
 ; ---- Browsing: the dock opened by clicking the tray number, with no window in hand ----
 ; Click a desktop to go there, its × (top right, on hover) to close it, + to make one. Grab a window
@@ -547,7 +547,7 @@ BarLayout(mon, n) {
 ; shown before the old one goes, so it never blinks.
 BarShow(mon, held, intro := true) {
     global bar, barShown, barTiles, barThumbs, barHover, barBox, deckGeom, deckShownAt, barHeld
-    global barBase, deckRise, tilesWin
+    global barBase, deckRise
     ; Uninterruptible: building the dock takes a moment (glass, wallpapers, miniatures), and a timer or
     ; a drag ending must not run in the middle of it (two docks stacked, or one torn down mid-build).
     Critical
@@ -567,42 +567,33 @@ BarShow(mon, held, intro := true) {
         deckRise := Round(DECK_RISE * lay.s)
     }
     sx := bx, sy := by + deckRise                   ; where it is right now
-    oldBar := bar, oldThumbs := barThumbs, oldTiles := tilesWin
-    ; Frosted glass by Windows itself (acrylic). On it, anything drawn the ordinary way (GDI) comes out
-    ; see-through, so the tiles (wallpapers, "+") are drawn in a window of their own, off screen, and
-    ; shown in the dock as DWM miniatures of it, like the windows' miniatures, which go over them.
-    ; The dock only keeps invisible click areas, and the names are drawn in the glow's layer above.
+    oldBar := bar, oldThumbs := barThumbs
+    ; A plain dark panel with rounded corners (a window region); the names are drawn in the glow's
+    ; layer above (DeckDrawOverlay).
     bar := Gui("-Caption +AlwaysOnTop +ToolWindow -DPIScale +E0x08000000", "EzDesk desktops")   ; NOACTIVATE: the drag goes on
-    bar.BackColor := "000000", bar.MarginX := 0, bar.MarginY := 0   ; black: see-through to the acrylic
-    tilesWin := Gui("-Caption +ToolWindow -DPIScale +E0x08000000", "EzDesk tiles")
-    tilesWin.BackColor := "2A2A33", tilesWin.MarginX := 0, tilesWin.MarginY := 0
+    bar.BackColor := "2B2C34", bar.MarginX := 0, bar.MarginY := 0
     barTiles := [], barThumbs := [], barHover := 0
     Loop n {
         i := A_Index - 1, x := pad + i * (tw + lay.gap), isNew := i >= count
         at := "x" x " y" pad " w" tw " h" th
         if isNew {
-            tilesWin.SetFont("s20 norm cC8C8D2", "Segoe UI Light")
-            tilesWin.AddText(at " Center +0x200 Background33333D", "+")   ; SS_CENTERIMAGE: centred both ways
+            bar.SetFont("s20 norm cC8C8D2", "Segoe UI Light")
+            ctl := bar.AddText(at " Center +0x200 Background3A3B45", "+")   ; SS_CENTERIMAGE: centred both ways
             name := "New desktop"
         } else {
             hbm := WallBitmap(DesktopWallpaper(i), tw, th)
-            hbm ? tilesWin.AddPicture(at, "HBITMAP:*" hbm) : tilesWin.AddText(at " Background33333D")
+            ctl := hbm ? bar.AddPicture(at, "HBITMAP:*" hbm) : bar.AddText(at " Background3A3B45")
             name := DesktopName(i)
             if (name = "")
                 name := "Desktop " (i + 1)
         }
-        ctl := bar.AddText(at " BackgroundTrans")    ; where a click on that tile lands
         barTiles.Push({x: x, y: pad, w: tw, h: th, target: isNew ? -2 : i, name: name, current: i = cur, ctl: ctl})   ; names: drawn by DeckDrawOverlay
         ctl.OnEvent("Click", BrowseClick.Bind(A_Index))   ; when browsing: go there, or close it
     }
-    tilesWin.Show("NA x-20000 y-20000 w" lay.bw " h" lay.bh)   ; off screen, never seen itself
-    VdaCall(pPin, "Ptr", tilesWin.Hwnd, "Int")
-    bar.Show("Hide x" sx " y" sy " w" lay.bw " h" lay.bh)
-    Frost(bar.Hwnd, 0x6A2E2E38)                     ; acrylic, lightly tinted
-    try DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", bar.Hwnd, "UInt", 33, "Int*", 1, "UInt", 4)   ; no 8 px rounding of its own: the region below decides
-    bar.Show("NA x" sx " y" sy " w" lay.bw " h" lay.bh)
+    bar.Show("Hide x" sx " y" sy " w" lay.bw " h" lay.bh)    ; sized, shaped, then shown
     DllCall("SetWindowRgn", "Ptr", bar.Hwnd, "Ptr", DllCall("CreateRoundRectRgn", "Int", 0, "Int", 0, "Int", lay.bw + 1, "Int", lay.bh + 1
-        , "Int", 2 * rad, "Int", 2 * rad, "Ptr"), "Int", true)   ; rounded, once shown
+        , "Int", 2 * rad, "Int", 2 * rad, "Ptr"), "Int", false)   ; rounded corners; Windows owns the region now
+    bar.Show("NA x" sx " y" sy " w" lay.bw " h" lay.bh)
     VdaCall(pPin, "Ptr", bar.Hwnd, "Int")           ; on every desktop: it stays put through a switch
     barBase := {x: bx, y: by}
     barBox := {x: sx, y: sy, w: lay.bw, h: lay.bh, mon: mon, gap: lay.gap, labelH: lay.labelH}
@@ -615,8 +606,6 @@ BarShow(mon, held, intro := true) {
         DllCall("dwmapi\DwmUnregisterThumbnail", "Ptr", thumb)
     if oldBar
         try oldBar.Destroy()
-    if oldTiles
-        try oldTiles.Destroy()
     if intro {
         BumpsOpen()
         WinGlowShow(held)
@@ -789,17 +778,6 @@ BarMiniatures(count, lay, held) {                   ; held: the window in your h
     DetectHiddenWindows(true)                       ; AutoHotkey counts windows on other desktops as hidden
     sx := lay.tw / (lay.mr - lay.ml), sy := lay.th / (lay.mb - lay.mt)
     props := Buffer(48, 0)                          ; DWM_THUMBNAIL_PROPERTIES
-    for tile in barTiles {                          ; first the tiles themselves (wallpaper, "+"), from the off-screen window
-        thumb := 0
-        if DllCall("dwmapi\DwmRegisterThumbnail", "Ptr", bar.Hwnd, "Ptr", tilesWin.Hwnd, "Ptr*", &thumb, "Int") != 0
-            continue
-        NumPut("UInt", 0x1 | 0x2 | 0x8, props, 0)   ; destination, source, visible
-        NumPut("Int", tile.x, "Int", tile.y, "Int", tile.x + tile.w, "Int", tile.y + tile.h, props, 4)
-        NumPut("Int", tile.x, "Int", tile.y, "Int", tile.x + tile.w, "Int", tile.y + tile.h, props, 20)
-        NumPut("Int", 1, props, 40)
-        DllCall("dwmapi\DwmUpdateThumbnailProperties", "Ptr", thumb, "Ptr", props, "Int")
-        barThumbs.Push(thumb)
-    }
     cloak := Buffer(4, 0)
     list := WinGetList(), k := list.Length
     while (k >= 1) {
@@ -900,7 +878,7 @@ SpringHover(hit) {
 BarTarget() => barShown && barHover ? barTiles[barHover].target : -1
 
 BarHide() {
-    global bar, barShown, barTiles, barThumbs, barHover, browseOn, tilesWin
+    global bar, barShown, barTiles, barThumbs, barHover, browseOn
     Critical
     browseOn := false
     if !barShown
@@ -908,8 +886,6 @@ BarHide() {
     for thumb in barThumbs
         DllCall("dwmapi\DwmUnregisterThumbnail", "Ptr", thumb)
     try bar.Destroy()
-    try tilesWin.Destroy()
-    tilesWin := 0
     deckGlow.Hide()
     BumpsHide()
     WinGlowHide()
@@ -1107,17 +1083,6 @@ DeckGlowFrame() {
     GlowPut(deckGlow, g.x, g.y, fw, fh, canvas, Round(240 * k * k * (3 - 2 * k)))
 }
 
-; Windows' own frosted glass (acrylic, the accent policy behind its menus; Windows 10 1803 and
-; later) behind a window, tinted with argb (0xAARRGGBB).
-Frost(hwnd, argb) {
-    accent := Buffer(16, 0)
-    NumPut("Int", 4, accent, 0)                     ; ACCENT_ENABLE_ACRYLICBLURBEHIND
-    NumPut("Int", 2, accent, 4)                     ; with the tint
-    NumPut("UInt", (argb & 0xFF000000) | ((argb & 0xFF) << 16) | (argb & 0xFF00) | ((argb >> 16) & 0xFF), accent, 8)   ; AABBGGRR
-    data := Buffer(A_PtrSize * 3, 0)                ; WINDOWCOMPOSITIONATTRIBDATA
-    NumPut("Int", 19, data, 0), NumPut("Ptr", accent.Ptr, data, A_PtrSize), NumPut("UPtr", 16, data, A_PtrSize * 2)   ; WCA_ACCENT_POLICY
-    try DllCall("SetWindowCompositionAttribute", "Ptr", hwnd, "Ptr", data)
-}
 
 GdipStart() {
     static token := 0
