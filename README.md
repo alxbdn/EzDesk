@@ -1,8 +1,8 @@
-﻿https://github.com/user-attachments/assets/f2da5e65-471d-4356-8566-0b6103217ed0
+https://github.com/user-attachments/assets/f2da5e65-471d-4356-8566-0b6103217ed0
 
 https://github.com/user-attachments/assets/49fcb27b-0a43-4b74-a364-c29653e6bf3f
 
-**[Get it from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)** Â· or [download the zip](https://github.com/alxbdn/ezdesk/releases/latest/download/EzDesk.zip)
+**[Get it from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)** · or [download the zip](https://github.com/alxbdn/ezdesk/releases/latest/download/EzDesk.zip)
 
 <img src="brand/ezdesk.svg" width="96" alt="EzDesk icon">
 
@@ -18,18 +18,18 @@ Move windows between virtual desktops with the mouse alone, on Windows 11, with 
 
 **[Get EzDesk from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)**, click **Get**, then **Open**. It's signed by Microsoft, so there's no warning, and it updates itself.
 
-It starts with Windows; you can turn that off in **Settings â€º Apps â€º Startup**. No numbered icon near the clock? Click the **^** arrow next to it and drag the icon onto the taskbar.
+It starts with Windows; you can turn that off in **Settings › Apps › Startup**. No numbered icon near the clock? Click the **^** arrow next to it and drag the icon onto the taskbar.
 
 ### From the zip (no Store, no admin, no console)
 
 1. **[Download EzDesk.zip](https://github.com/alxbdn/ezdesk/releases/latest/download/EzDesk.zip)**
-2. Right-click the zip â†’ **Properties** â†’ tick **Unblock** â†’ **OK**
-3. Right-click the zip â†’ **Extract Allâ€¦** â†’ pick your **Documents** folder â†’ **Extract**
+2. Right-click the zip → **Properties** → tick **Unblock** → **OK**
+3. Right-click the zip → **Extract All…** → pick your **Documents** folder → **Extract**
 4. Open the `EzDesk` folder and double-click **`EzDesk.exe`**
 5. No numbered icon near the clock? Click the **^** arrow next to it and drag the icon onto the taskbar
-6. Right-click the icon â†’ **Start with Windows**, so it starts by itself next time
+6. Right-click the icon → **Start with Windows**, so it starts by itself next time
 
-> **"Windows protected your PC"?** Click **More info** â†’ **Run anyway**. The exe isn't code-signed, so Windows doesn't recognize it. `EzDesk.exe` is the official AutoHotkey v2 runtime, renamed and given the app's own icon and name, and the zip is built by [GitHub Actions](.github/workflows/release.yml) from the code in this repo. Step 2 usually prevents the warning.
+> **"Windows protected your PC"?** Click **More info** → **Run anyway**. The exe isn't code-signed, so Windows doesn't recognize it. `EzDesk.exe` is the official AutoHotkey v2 runtime, renamed and given the app's own icon and name, and the zip is built by [GitHub Actions](.github/workflows/release.yml) from the code in this repo. Step 2 usually prevents the warning.
 
 Keep the folder where you extracted it: "Start with Windows" points to it. If you move the folder, start `EzDesk.exe` once from the new place and the shortcut follows.
 
@@ -46,8 +46,8 @@ Everything is done with the mouse.
 | Bring it into the glowing bump on the left or right of the screen | Hold it there: you slide to the previous / next desktop with the window in hand (a new one after the last), one every 0.75 s |
 | Drop it anywhere else | An ordinary move; the dock goes away |
 | Scroll on the taskbar | Previous / next desktop |
-| Scroll on the tray (volume, clockâ€¦) | Normal Windows behavior, volume still works |
-| Click the tray icon (the desktop number) | Opens the dock without a window in hand: click a desktop to go there, its **Ã—** to close it (Windows 11), **+** to make one; grab any window by its title bar and it glows at once, drop it on a desktop to send it there. Click anywhere else, or the number again, to close the dock. Task View is in the icon's menu |
+| Scroll on the tray (volume, clock…) | Normal Windows behavior, volume still works |
+| Click the tray icon (the desktop number) | Opens the dock without a window in hand: click a desktop to go there, its **×** to close it (Windows 11), **+** to make one; grab any window by its title bar and it glows at once, drop it on a desktop to send it there. Click anywhere else, or the number again, to close the dock. Task View is in the icon's menu |
 | Right-click the tray icon | Hold a window to move it between desktops, Performance mode, show apps from all desktops on the taskbar, Start with Windows, Help, Restart, Exit |
 
 **Performance mode** (tray menu): on a slow PC, EzDesk already lightens its animations by itself while the PC is struggling, and goes back to full ones when it recovers. Tick this to keep them light all the time.
@@ -56,14 +56,14 @@ Windows' Snap keeps working while the dock is open, on any desktop: let go again
 
 The first time you switch desktops while the taskbar only shows the current desktop's apps, EzDesk offers, in a notification, to show them all: click it and it's done (the Store version opens the Settings page where it's one switch).
 
-**Taskbar: show apps from all desktops** (tray menu) turns on Windows' own setting, so the taskbar marks every open app on every desktop, not only the ones on the current desktop. Clicking an app that's on another desktop takes you there. In the Store version, it opens the Settings page (Multitasking â€º Desktops) where you change it.
+**Taskbar: show apps from all desktops** (tray menu) turns on Windows' own setting, so the taskbar marks every open app on every desktop, not only the ones on the current desktop. Clicking an app that's on another desktop takes you there. In the Store version, it opens the Settings page (Multitasking › Desktops) where you change it.
 
-EzDesk 1.3 dropped the keyboard shortcuts of earlier versions (`Alt + 1â€¦9`, `Alt + Shift + 1â€¦9`): it's mouse-first now.
+EzDesk 1.3 dropped the keyboard shortcuts of earlier versions (`Alt + 1…9`, `Alt + Shift + 1…9`): it's mouse-first now.
 
 ## Uninstall
 
-- **Store version:** Settings â€º Apps â€º Installed apps â†’ EzDesk (Desktop Switcher in older versions) â†’ **Uninstall**.
-- **Zip version:** right-click the tray icon â†’ untick **Start with Windows** â†’ **Exit**, then delete the folder.
+- **Store version:** Settings › Apps › Installed apps → EzDesk (Desktop Switcher in older versions) → **Uninstall**.
+- **Zip version:** right-click the tray icon → untick **Start with Windows** → **Exit**, then delete the folder.
 
 Don't keep both installed: they'd both react to the same mouse moves.
 
@@ -92,7 +92,7 @@ It downloads pinned versions of AutoHotkey and VirtualDesktopAccessor, checks th
 
 - **"DLL may not match this Windows build" after a Windows update:** VirtualDesktopAccessor relies on undocumented Windows internals that sometimes change between builds. Check its [releases](https://github.com/Ciantic/VirtualDesktopAccessor/releases) for a newer DLL. Update the URL and SHA256 in `build-release.ps1` and `admin\install.ps1`.
 - **Tooltip says "waiting for Windows virtual desktops":** Windows isn't answering yet, which is normal for a few seconds after login. If it stays that way, use **Restart** from the icon's menu. Before v1.0.1, this showed as a green "H" icon that couldn't be closed.
-- **Can't find it after double-clicking:** it's running, but Windows put the icon under the `^` arrow next to the clock. Windows doesn't let apps show their own icon, so each time it starts, if the icon is hidden, EzDesk says so in a notification: click it to open the Settings page where you turn it on (Windows 11: Taskbar â€º Other system tray icons). Don't want it? Untick **Remind me when this icon is hidden** in the tray menu; it also stops by itself after three reminders closed without a click. You can also drag it out of `^` onto the taskbar. Double-clicking the exe again just restarts it.
+- **Can't find it after double-clicking:** it's running, but Windows put the icon under the `^` arrow next to the clock. Windows doesn't let apps show their own icon, so each time it starts, if the icon is hidden, EzDesk says so in a notification: click it to open the Settings page where you turn it on (Windows 11: Taskbar › Other system tray icons). Don't want it? Untick **Remind me when this icon is hidden** in the tray menu; it also stops by itself after three reminders closed without a click. You can also drag it out of `^` onto the taskbar. Double-clicking the exe again just restarts it.
 Tested on Windows 11 26H2 (build 26300).
 
 ## License
