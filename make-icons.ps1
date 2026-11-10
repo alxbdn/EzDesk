@@ -1,4 +1,4 @@
-# Generates the tray icons: a black rounded square with a blue number, 1-9 plus 'more' for 10+.
+﻿# Generates the tray icons: a black rounded square with a blue number, 1-9 plus 'more' for 10+.
 # Usage: .\make-icons.ps1 -OutDir <folder> [-Outline 0|1|2] [-Ink '#RRGGBB']
 #   Outline: border width in px at 16px (0 = none); Ink: the number's (and border's) colour
 # (The app's own icon is brand\ezdesk.ico; these are only the numbered tray badges.)
@@ -10,7 +10,7 @@ Add-Type -AssemblyName System.Drawing
 $sizes = $Sizes
 $labels = $Labels
 $bg = [System.Drawing.Color]::Black
-$ink = [System.Drawing.ColorTranslator]::FromHtml($Ink)    # the glow's blue: no white anywhere
+$inkColor = [System.Drawing.ColorTranslator]::FromHtml($Ink)    # the glow's blue: no white anywhere
 
 function RoundRect([double]$x, [double]$y, [double]$w, [double]$h, [double]$r) {
     $p = New-Object System.Drawing.Drawing2D.GraphicsPath
@@ -40,7 +40,7 @@ function New-Png([string]$text, [int]$s) {
     if ($Outline -gt 0) {
         $pw = [math]::Max(1.0, [math]::Round($Outline * $s / 16))   # whole pixels only
         $h = $pw / 2
-        $pen = New-Object System.Drawing.Pen $ink, $pw
+        $pen = [System.Drawing.Pen]::new($inkColor, [single]$pw)
         $g.DrawPath($pen, (RoundRect ($m + $h) ($m + $h) ($side - $pw) ($side - $pw) ([math]::Max(1, $r - $h))))
     }
 
@@ -53,7 +53,7 @@ function New-Png([string]$text, [int]$s) {
     $mx = New-Object System.Drawing.Drawing2D.Matrix
     $mx.Translate(($s - $b.Width) / 2 - $b.X, ($s - $b.Height) / 2 - $b.Y)
     $tp.Transform($mx)
-    $g.FillPath((New-Object System.Drawing.SolidBrush $ink), $tp)
+    $g.FillPath([System.Drawing.SolidBrush]::new($inkColor), $tp)
 
     $g.Dispose()
     # Classic DIB icon frame: BITMAPINFOHEADER + bottom-up BGRA pixels + 1bpp AND mask
