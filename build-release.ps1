@@ -56,10 +56,12 @@ try {
 
     # --- App files ---------------------------------------------------------------------------------
     Copy-Item "$root\EzDesk.ahk" $stage
+    New-Item -ItemType Directory -Force "$stage\lib" | Out-Null
+    Copy-Item "$root\lib\*.ahk" "$stage\lib"
     Copy-Item "$root\admin\*" "$stage\admin"
     Copy-Item "$root\LICENSE" "$stage\LICENSE.txt"
     Copy-Item "$root\THIRD-PARTY-NOTICES.md" "$stage\THIRD-PARTY-NOTICES.txt"
-    & "$root\make-icons.ps1" -OutDir "$stage\icons" -Outline 1 | Out-Null
+    & "$root\make-icons.ps1" -OutDir "$stage\icons" -Outline 0 | Out-Null
 
     @"
 EzDesk $Version  (formerly Desktop Switcher)
@@ -70,17 +72,19 @@ START
      If Windows says "Windows protected your PC": click "More info", then "Run anyway".
   2. Right-click the icon > "Start with Windows" so it starts by itself.
 
-SHORTCUTS
-  Alt + 1...9           go to desktop N (creates the next desktop if N does not exist yet)
-  Alt + Shift + 1...9   move the active window to desktop N (creates it the same way if needed)
+HOW IT WORKS (mouse only)
+  Hold a window still   hold it by its title bar for a moment: a dock of your desktops
+                        opens at the bottom; drop the window on one to send it there
+  Side bumps            or bring it into the glowing bump on the left / right of the
+                        screen to slide to the previous / next desktop with it
   Scroll on taskbar     previous / next desktop
-  Click the icon        Task View
+  Click the icon        the dock: go to a desktop, close one, make a new one
 
 STOP / REMOVE
   Right-click the icon > untick "Start with Windows" > Exit, then delete this folder.
 
 ADMIN MODE (optional, for power users)
-  Makes the shortcuts work even over admin windows (Task Manager, installers...).
+  Makes it work with admin windows too (Task Manager, installers...).
   Double-click admin\Install admin mode.cmd. Remove it with admin\Uninstall admin mode.cmd.
 "@ | Set-Content "$stage\README.txt" -Encoding UTF8
 

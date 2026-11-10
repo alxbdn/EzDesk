@@ -1,12 +1,14 @@
 https://github.com/user-attachments/assets/f2da5e65-471d-4356-8566-0b6103217ed0
 
+https://github.com/user-attachments/assets/49fcb27b-0a43-4b74-a364-c29653e6bf3f
+
 **[Get it from the Microsoft Store](https://apps.microsoft.com/detail/9MV9P36W441C)** · or [download the zip](https://github.com/alxbdn/ezdesk/releases/latest/download/EzDesk.zip)
 
 <img src="brand/ezdesk.svg" width="96" alt="EzDesk icon">
 
 # EzDesk
 
-Fast virtual-desktop switching for Windows 11, with a tray icon that shows which desktop you're on. Formerly called Desktop Switcher. It also runs on Windows 10. Built on [AutoHotkey v2](https://www.autohotkey.com) and [VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor).
+Move windows between virtual desktops with the mouse alone, on Windows 11, with a tray icon that shows which desktop you're on. No keyboard shortcuts to learn. Formerly called Desktop Switcher. It also runs on Windows 10. Built on [AutoHotkey v2](https://www.autohotkey.com) and [VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor).
 
 ![Tray icons](docs/icons.png)
 
@@ -31,35 +33,43 @@ It starts with Windows; you can turn that off in **Settings › Apps › Startup
 
 Keep the folder where you extracted it: "Start with Windows" points to it. If you move the folder, start `EzDesk.exe` once from the new place and the shortcut follows.
 
-## Shortcuts
+## How it works
+
+Everything is done with the mouse.
 
 | Action | Effect |
 |---|---|
-| `Alt + 1…9` | Go to desktop N. If it doesn't exist yet, creates **one** new desktop and goes there (with 2 desktops, `Alt + 4` creates desktop 3) |
-| `Alt + Shift + 1…9` | Move the active window to desktop N and follow it, creating the new desktop the same way if needed |
-| Scroll on the 
-
-https://github.com/user-attachments/assets/49fcb27b-0a43-4b74-a364-c29653e6bf3f
-
-
-
-taskbar | Previous / next desktop |
+| Grab a window by its title bar (moving it or not) | A dock of your desktops rises at the bottom of the screen, a dark rounded panel ringed with a flowing blue glow, each desktop a live miniature, like the Spaces bar on a Mac (your windows don't move around as in Task View). The window you hold glows too, and stays in front |
+| Bring it over the dock | It shrinks to a small, see-through picture of itself, like on a Mac, so you see the dock under it, and grows back when it leaves |
+| Drop it on a desktop in the dock | It goes there, and you stay where you are. On Windows 11, **+** makes a new desktop |
+| Keep it over a desktop in the dock for a second | You slide to that desktop, the window still in your hand |
+| Bring it into the glowing bump on the left or right of the screen | Hold it there: you slide to the previous / next desktop with the window in hand (a new one after the last), one every 0.75 s |
+| Drop it anywhere else | An ordinary move; the dock goes away |
+| Scroll on the taskbar | Previous / next desktop |
 | Scroll on the tray (volume, clock…) | Normal Windows behavior, volume still works |
-| Click the tray icon | Task View |
-| Right-click the tray icon | Start with Windows, Help, Restart, Exit |
+| Click the tray icon (the desktop number) | Opens the dock without a window in hand: click a desktop to go there, its **×** to close it (Windows 11), **+** to make one; grab any window by its title bar and it glows at once, drop it on a desktop to send it there. Click anywhere else, or the number again, to close the dock. Task View is in the icon's menu |
+| Right-click the tray icon | Hold a window to move it between desktops, Performance mode, show apps from all desktops on the taskbar, Start with Windows, Help, Restart, Exit |
 
-Shortcuts use the physical keys of the number row, so they work on any keyboard layout. On AZERTY, that's `Alt + &`, `Alt + é`… with no Shift needed to get the digit.
+**Performance mode** (tray menu): on a slow PC, EzDesk already lightens its animations by itself while the PC is struggling, and goes back to full ones when it recovers. Tick this to keep them light all the time.
+
+Windows' Snap keeps working while the dock is open, on any desktop: let go against the edge before the bump fills (0.75 s) and the window snaps to half the screen as usual.
+
+The first time you switch desktops while the taskbar only shows the current desktop's apps, EzDesk offers, in a notification, to show them all: click it and it's done (the Store version opens the Settings page where it's one switch).
+
+**Taskbar: show apps from all desktops** (tray menu) turns on Windows' own setting, so the taskbar marks every open app on every desktop, not only the ones on the current desktop. Clicking an app that's on another desktop takes you there. In the Store version, it opens the Settings page (Multitasking › Desktops) where you change it.
+
+EzDesk 1.3 dropped the keyboard shortcuts of earlier versions (`Alt + 1…9`, `Alt + Shift + 1…9`): it's mouse-first now.
 
 ## Uninstall
 
 - **Store version:** Settings › Apps › Installed apps → EzDesk (Desktop Switcher in older versions) → **Uninstall**.
 - **Zip version:** right-click the tray icon → untick **Start with Windows** → **Exit**, then delete the folder.
 
-Don't keep both installed: they'd both react to the same shortcuts.
+Don't keep both installed: they'd both react to the same mouse moves.
 
 ## Power users: admin mode
 
-Windows won't let a normal program receive keystrokes meant for an admin window. In the simple install, `Alt + 1…9` therefore doesn't work while Task Manager, an installer or an admin terminal is the active window. Scrolling on the taskbar still works.
+Windows won't let a normal program act on admin windows. In the simple install, holding Task Manager, an installer or an admin terminal therefore doesn't open the dock. Scrolling on the taskbar still works.
 
 Admin mode fixes that. It copies the app to `C:\Program Files\EzDesk\`, makes that folder admin-only for writing, and registers an **EzDesk** scheduled task that starts it at logon with admin rights, with no UAC prompt each time.
 
@@ -78,12 +88,17 @@ powershell -ExecutionPolicy Bypass -File .\build-release.ps1 -Version 1.0.0
 
 It downloads pinned versions of AutoHotkey and VirtualDesktopAccessor, checks their SHA256, generates the icons with `make-icons.ps1` and writes `dist\EzDesk.zip`. Pushing a `v*` tag runs the same build on GitHub Actions and publishes the release.
 
+The code is `EzDesk.ahk` plus four modules in `lib\`: `Desktops.ahk` (Windows' virtual desktops), `Hold.ahk` (the hold gesture, from the press to the drop), `HeldWindow.ahk` (how the window in hand looks while it's held, and putting it back) and `Glow.ahk` (the light round the dock and the bumps). Their tests run without touching your desktops or your screen:
+
+```powershell
+dist\EzDesk\EzDesk.exe /ErrorStdOut tests\run-tests.ahk
+```
+
 ## Troubleshooting
 
 - **"DLL may not match this Windows build" after a Windows update:** VirtualDesktopAccessor relies on undocumented Windows internals that sometimes change between builds. Check its [releases](https://github.com/Ciantic/VirtualDesktopAccessor/releases) for a newer DLL. Update the URL and SHA256 in `build-release.ps1` and `admin\install.ps1`.
 - **Tooltip says "waiting for Windows virtual desktops":** Windows isn't answering yet, which is normal for a few seconds after login. If it stays that way, use **Restart** from the icon's menu. Before v1.0.1, this showed as a green "H" icon that couldn't be closed.
-- **Can't find it after double-clicking:** it's running, but Windows put the icon under the `^` arrow next to the clock. Drag it onto the taskbar. Double-clicking the exe again just restarts it.
-
+- **Can't find it after double-clicking:** it's running, but Windows put the icon under the `^` arrow next to the clock. Windows doesn't let apps show their own icon, so each time it starts, if the icon is hidden, EzDesk says so in a notification: click it to open the Settings page where you turn it on (Windows 11: Taskbar › Other system tray icons). Don't want it? Untick **Remind me when this icon is hidden** in the tray menu; it also stops by itself after three reminders closed without a click. You can also drag it out of `^` onto the taskbar. Double-clicking the exe again just restarts it.
 Tested on Windows 11 26H2 (build 26300).
 
 ## License
