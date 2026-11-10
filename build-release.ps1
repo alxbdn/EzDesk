@@ -56,6 +56,8 @@ try {
 
     # --- App files ---------------------------------------------------------------------------------
     Copy-Item "$root\EzDesk.ahk" $stage
+    New-Item -ItemType Directory -Force "$stage\lib" | Out-Null
+    Copy-Item "$root\lib\*.ahk" "$stage\lib"
     Copy-Item "$root\admin\*" "$stage\admin"
     Copy-Item "$root\LICENSE" "$stage\LICENSE.txt"
     Copy-Item "$root\THIRD-PARTY-NOTICES.md" "$stage\THIRD-PARTY-NOTICES.txt"

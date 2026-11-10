@@ -1,4 +1,4 @@
-﻿#Requires AutoHotkey v2.0
+#Requires AutoHotkey v2.0
 #SingleInstance Force
 Persistent
 
@@ -16,100 +16,31 @@ Persistent
 ; virtual-desktop DLL is only called afterwards, from a timer. If Windows'
 ; virtual desktops aren't reachable yet (login, Explorer restart) the app
 ; still shows its own icon, its menu still works and Exit still exits.
+;
+; Three modules live in lib\, each with its own tests in tests\:
+;   Desktops.ahk   Windows' virtual desktops, behind one seam (the DLL and Windows' shortcuts)
+;   Hold.ahk       the hold gesture: from a press on a title bar to the drop, as intents
+;   Glow.ahk       the flowing light round the dock and on the side bumps
+; This file wires them to the mouse, the screen and the tray.
+
+#Include %A_ScriptDir%\lib\Dib.ahk
+#Include %A_ScriptDir%\lib\Glow.ahk
+#Include %A_ScriptDir%\lib\Desktops.ahk
+#Include %A_ScriptDir%\lib\Hold.ahk
 
 ; Our icon right away, never AutoHotkey's green "H".
 TraySetIcon(A_ScriptDir "\icons\1.ico")
 A_IconTip := "EzDesk (starting…)"
 
-; ---------------------------------------------------------------------
-;  VirtualDesktopAccessor: Windows 11 and Windows 10 need different builds
-; ---------------------------------------------------------------------
+; VirtualDesktopAccessor: Windows 11 and Windows 10 need different builds.
 global WIN_BUILD := Integer(StrSplit(A_OSVersion, ".")[3])
-global VDA  := A_ScriptDir (WIN_BUILD >= 22000 ? "\VirtualDesktopAccessor.dll" : "\VirtualDesktopAccessor-win10.dll")
-global hVDA := DllCall("LoadLibrary", "Str", VDA, "Ptr")
-if !hVDA {
-    MsgBox("Could not load " VDA, "EzDesk", "Iconx")
-    ExitApp(1)
-}
-
-Proc(name, required := true) {
-    p := DllCall("GetProcAddress", "Ptr", hVDA, "AStr", name, "Ptr")
-    if (!p && required) {
-        MsgBox("VirtualDesktopAccessor.dll has no " name "().`nIt may not match this Windows build (" WIN_BUILD ").", "EzDesk", "Iconx")
-        ExitApp(1)
-    }
-    return p
-}
-
-global pCount   := Proc("GetDesktopCount")
-global pCurrent := Proc("GetCurrentDesktopNumber")
-global pMove    := Proc("MoveWindowToDesktopNumber")
-global pOnCur   := Proc("IsWindowOnCurrentVirtualDesktop")
-global pHook    := Proc("RegisterPostMessageHook")
-global pName    := Proc("GetDesktopName", false)    ; Windows 11 build only
-global pCreate  := Proc("CreateDesktop", false)     ; Windows 11 build only (Windows 10: Ctrl+Win+D)
-global pPin     := Proc("PinWindow", false)         ; drag to the screen edge needs these two
-global pUnpin   := Proc("UnPinWindow", false)
-global pWinDesk := Proc("GetWindowDesktopNumber", false)   ; the desktop bar's miniatures need it
-global pRemove  := Proc("RemoveDesktop", false)     ; Windows 11 build only: closing a desktop from the dock
-
-; Every call into the DLL goes through VdaCall(). A DLL that doesn't match this Windows build crashes
-; (access violation 0xC0000005) instead of returning an error. Without this, AutoHotkey shows an
-; error dialog every second and the app looks frozen. Three crashes and we stop calling it at all.
-global vdaErrors := 0, vdaBroken := false
-
-VdaCall(p, args*) {
-    global vdaErrors, vdaBroken
-    if vdaBroken
-        return -1
-    try return DllCall(p, args*)
-    catch {
-        vdaErrors += 1
-        if (vdaErrors >= 3 && !vdaBroken) {
-            vdaBroken := true
-            A_IconTip := "EzDesk: not compatible with this Windows (build " WIN_BUILD ")"
-            TrayTip("The virtual-desktop library doesn't work on this Windows version (build " WIN_BUILD ").`nShortcuts are disabled. See Help in this icon's menu.", "EzDesk", "Iconx Mute")
-        }
-        return -1
-    }
-}
-
-; The DLL counts desktops from 0; everything the user sees counts from 1.
-DesktopCount()   => VdaCall(pCount, "Int")
-CurrentDesktop() => VdaCall(pCurrent, "Int")
-
-DesktopName(i) {
-    if !pName
-        return ""
-    buf := Buffer(1024, 0)
-    if (VdaCall(pName, "Int", i, "Ptr", buf, "UPtr", buf.Size, "Int") = -1 && vdaBroken)
-        return ""
-    return StrGet(buf, "UTF-8")                     ; "" when the desktop has no custom name
-}
-
-; ---------------------------------------------------------------------
-;  Switching
-; ---------------------------------------------------------------------
-; Creates one desktop at the end; returns its 0-based index, or -1 if it didn't appear.
-; Success is read from the desktop count, not from the call's return value.
-NewDesktop(count) {
-    if pCreate
-        VdaCall(pCreate, "Int")
-    else
-        Send("^#d")                                 ; Windows 10 DLL can't create desktops: Windows' own shortcut does (and switches to it)
-    deadline := A_TickCount + 1500
-    while (A_TickCount < deadline) {
-        if (DesktopCount() > count)
-            return count
-        Sleep(50)
-    }
-    return -1
-}
+global desk := Desktops(VdaAdapter(A_ScriptDir (WIN_BUILD >= 22000 ? "\VirtualDesktopAccessor.dll" : "\VirtualDesktopAccessor-win10.dll"), WIN_BUILD))
+GlowShape.pin := (hwnd) => desk.Pin(hwnd)           ; the glows stay on screen through a switch
 
 ; Focuses the top window of the current desktop (after the active one left for another desktop).
 FocusTopWindow() {
     for hwnd in WinGetList() {                      ; top-most first
-        if IsRealWindow(hwnd) && VdaCall(pOnCur, "Ptr", hwnd, "Int") = 1 {
+        if IsRealWindow(hwnd) && desk.IsOnCurrent(hwnd) {
             try WinActivate(hwnd)
             return
         }
@@ -128,106 +59,51 @@ IsRealWindow(hwnd) {
     return false
 }
 
+; Scrolling on the taskbar.
 Step(delta) {
     static last := 0
     if (A_TickCount - last < 250)                   ; touchpads send bursts of wheel events
         return
     last := A_TickCount
-    i := CurrentDesktop() + delta
-    if (i >= 0 && i < DesktopCount())
-        Send(delta < 0 ? "^#{Left}" : "^#{Right}")  ; Windows' own switch: it slides, where the DLL's is instant
+    desk.Slide(delta)
 }
 
 ; ---------------------------------------------------------------------
 ;  Holding a window: take it to another desktop
 ; ---------------------------------------------------------------------
-; Windows announces the start and end of every window drag (EVENT_SYSTEM_MOVESIZESTART/END).
-; While a window is held by its title bar, timers watch the cursor. Kept still for a moment, the
-; dock opens (further down), with a glowing bump on each side of the screen: bring the window into
-; one and hold it there, and you slide to the next / previous desktop with it, one every 0.75 s.
+; Windows announces the start and end of every window drag (EVENT_SYSTEM_MOVESIZESTART/END), and a
+; press on a title bar is seen as it happens (a drag is only announced once the mouse has moved a
+; few pixels). Both go to the hold gesture (lib\Hold.ahk); while a window is in hand, HoldTick
+; tells it what the mouse and the dock are doing every 15 ms, and does what it answers.
 ; The window is pinned (shown on every desktop) from the start of the drag, so switching neither
-; hides it nor ends the drag; on release it's unpinned onto the desktop you're on.
-; Switching uses Windows' own Ctrl+Win+arrow (Ctrl+Win+D for a new desktop): it slides like
-; Windows does, where the DLL's switch is instant and blinks.
+; hides it nor ends the drag; on release it's unpinned onto the desktop it's dropped on.
 global SETTINGS := A_AppData "\EzDesk\settings.ini"         ; per-package private copy when packaged
 global holdOn := IniRead(SETTINGS, "EzDesk", "HoldWindow", 1) = 1       ; the dock and its side bumps
 global perfMode := IniRead(SETTINGS, "EzDesk", "Performance", 0) = 1    ; lighter animation, always
 global trayReminder := IniRead(SETTINGS, "EzDesk", "TrayReminder", 1) = 1   ; say so when the tray icon is hidden
-global dragHwnd := 0, edgeSide := 0, edgeSince := 0, dragPinned := false
+global hold := HoldGesture()
 
-; Pins the held window to every desktop, once. Done when the drag starts, not at the switch itself:
-; Windows needs a moment to take a pin into account, and a window pinned just before the slide
-; starts goes off with the old desktop and pops back after.
-PinHeld(hwnd) {
-    global dragPinned
-    if (dragPinned || !hwnd)
-        return
-    VdaCall(pPin, "Ptr", hwnd, "Int")
-    dragPinned := true
+; Where a window is, to put it back there when it's dropped on the dock.
+WindowPlace(hwnd) {
+    try {
+        WinGetPos(&x, &y, &w, &h, hwnd)
+        return {max: WinGetMinMax(hwnd) = 1, x: x, y: y, w: w, h: h}
+    }
+    return 0
 }
-global dragFrom := {max: false, x: 0, y: 0, w: 0, h: 0}     ; where the window was picked up
 
 OnMoveSize(hook, event, hwnd, idObject, idChild, thread, time) {
-    global dragHwnd, edgeSide, edgeSince, dragPinned, dragFrom, stillX, stillY, stillSince
     if (idObject != 0)                              ; OBJID_WINDOW only
         return
     if (event = 0x000A) {                           ; drag started
-        if !holdOn || !pPin || !pUnpin || !pWinDesk || !DraggedByTitle(hwnd)
+        if !holdOn || !desk.CanCarry || !DraggedByTitle(hwnd)
             return
-        dragHwnd := hwnd, edgeSide := 0, edgeSince := 0, dragPinned := false
-        PinHeld(hwnd)                               ; ready to come along before any switch
-        if (hwnd != pressHwnd) {                    ; a press already counts from when it was picked up
-            CoordMode("Mouse", "Screen")
-            MouseGetPos(&stillX, &stillY), stillSince := A_TickCount
-        }
-        try {
-            WinGetPos(&fx, &fy, &fw, &fh, hwnd)
-            dragFrom := {max: WinGetMinMax(hwnd) = 1, x: fx, y: fy, w: fw, h: fh}
-        }
-        SetTimer(WatchDrag, 15)                     ; often enough for smooth pulses
-    } else if (event = 0x000B && hwnd = dragHwnd) { ; drag ended: mouse released
-        SetTimer(WatchDrag, 0)
-        target := BarTarget(), BarHide()            ; dropped on the desktop bar?
-        pinned := dragPinned, from := dragFrom
-        dragHwnd := 0, dragPinned := false
-        if (target != -1)
-            SetTimer(() => DropOnDesktop(hwnd, target, pinned, from), -1)   ; out of the event callback first
-        else if pinned
-            SetTimer(() => DropOnCurrent(hwnd), -1)
-    }
-}
-
-; The window was carried across desktops: give it back to the desktop you ended up on.
-; Moved first, then unpinned, so it never vanishes in between.
-DropOnCurrent(hwnd) {
-    i := CurrentDesktop()
-    if (i >= 0)
-        VdaCall(pMove, "Ptr", hwnd, "Int", i, "Int")
-    VdaCall(pUnpin, "Ptr", hwnd, "Int")
-    try WinActivate(hwnd)
-}
-
-; Dropped on the desktop bar (target: desktop index, or -2 for "+"): the window goes to that
-; desktop, back where it was picked up, and you stay where you are, like on a Mac.
-DropOnDesktop(hwnd, target, pinned, from) {
-    if (target = -2)
-        target := NewDesktop(DesktopCount())        ; only offered where it's made without going there
-    try {
-        if from.max {
-            WinMaximize(hwnd)
-        } else {
-            if (WinGetMinMax(hwnd) = 1)             ; Windows maximized it, dropped near the top
-                WinRestore(hwnd)
-            WinMove(from.x, from.y, from.w, from.h, hwnd)
-        }
-    }
-    if (target >= 0 && target != CurrentDesktop()) {
-        VdaCall(pMove, "Ptr", hwnd, "Int", target, "Int")
-        if pinned
-            VdaCall(pUnpin, "Ptr", hwnd, "Int")
-        FocusTopWindow()                            ; it left: the next window here gets the focus
-    } else if pinned {
-        DropOnCurrent(hwnd)
+        CoordMode("Mouse", "Screen")
+        MouseGetPos(&x, &y)
+        Perform(hold.DragStart(hwnd, x, y, A_TickCount, WindowPlace(hwnd)))
+        SetTimer(HoldTick, 15)                      ; often enough for smooth pulses
+    } else if (event = 0x000B) {                    ; drag ended: mouse released
+        Perform(hold.DragEnd(hwnd))
     }
 }
 
@@ -241,97 +117,73 @@ DraggedByTitle(hwnd) {
     return hit = 1 || hit = 2                       ; HTCLIENT, HTCAPTION
 }
 
-WatchDrag() {
-    if !dragHwnd || !GetKeyState("LButton", "P")
+; Every 15 ms while a window is in hand, or the dock is open from the tray: one frame of the dock,
+; then the gesture is told what happened, then what it answers is done. Drawing comes first, so a
+; desktop switch never happens in the middle of a frame.
+HoldTick() {
+    if (hold.phase = "idle" && !(browseOn && barShown)) {
+        SetTimer(HoldTick, 0)
         return
-    if (HeldStill() && !barShown)
-        BarShow(MonitorAt(stillX, stillY), dragHwnd)   ; held without moving: the dock and the bumps
-    if barShown
-        BarTrack()
+    }
+    CoordMode("Mouse", "Screen")
+    MouseGetPos(&x, &y)
+    edge := barShown ? BarTrack(x, y) : 0
+    Perform(hold.Tick({now: A_TickCount, down: GetKeyState("LButton", "P"), dockOpen: barShown
+        , target: BarTarget(), current: barShown ? desk.Current() : -1, edge: edge}))
 }
 
-; ---------------------------------------------------------------------
-;  Glow: the flowing light round the dock, the held window and on the side bumps
-; ---------------------------------------------------------------------
-; Windows blue (#0063B1) brightening to white and back, alive. Two layers of those colours slide at
-; different speeds and in opposite directions; where they cross they mix, so the light keeps
-; shifting instead of just sliding. Each shape is a layered window (per-pixel alpha) that clicks go
-; through, never activated, not in the taskbar, and pinned to every desktop so it stays on screen
-; through a desktop switch. A frame is a few GDI calls: colours, mixed, shaped by a precomputed mask.
-; Careful with names: AutoHotkey ignores case, so "L" would be the same variable as "l".
-global GLOW_COLORS := [0x0063B1, 0x2A82CC, 0x8CC0EC, 0xFFFFFF, 0x8CC0EC, 0x2A82CC]   ; blue to white and back
-global GLOW_FLOW_MS := 2600, GLOW_FLOW2_MS := 3700   ; time for each layer to slide one period
-
-GlowPut(g, x, y, w, h, src, alpha) {
-    DllCall("UpdateLayeredWindow", "Ptr", g.Hwnd, "Ptr", 0, "Int64*", (y << 32) | (x & 0xFFFFFFFF)
-        , "Int64*", (h << 32) | w, "Ptr", src, "Int64*", 0, "UInt", 0
-        , "UInt*", (1 << 24) | (alpha << 16), "UInt", 2)   ; BLENDFUNCTION: per-pixel alpha × alpha; ULW_ALPHA
+; Does what the hold gesture says (lib\Hold.ahk lists its intents).
+Perform(intents) {
+    global barHeld
+    for it in intents {
+        switch it.do {
+            case "grab":
+                barHeld := it.hwnd, WinGlowShow(it.hwnd)
+            case "open":
+                BarShow(MonitorAt(it.x, it.y), it.hwnd)
+            case "carry":
+                desk.Pin(it.hwnd)                   ; at the drag's start, not at the switch: a window pinned just
+                                                    ; before the slide goes off with the old desktop and pops back
+            case "close":
+                BarHide()
+            case "letGo":
+                WinGlowHide()
+            case "slide":
+                desk.GoTo(it.to)
+                SetTimer(BarRefresh, -450)          ; once the slide is done, the dock shows where you are
+            case "step":
+                if desk.Slide(it.side, true) {
+                    bumpSquash[it.side < 0 ? 1 : 2] := 1   ; the little bounce
+                    SetTimer(BarRefresh, -450)
+                }
+            case "drop":
+                BarHide()
+                hwnd := it.hwnd, target := it.target, carried := it.carried, from := it.from
+                SetTimer(() => DropWindow(hwnd, target, carried, from), -1)   ; out of the event callback first
+        }
+    }
 }
 
-; Brightness d pixels out from a shape's edge: a thin bright line on the edge inside a soft haze
-; w wide, with a 1-pixel soft rim just inside. The two layers are mixed, not stacked, so the haze is
-; lifted to what stacking them would give.
-GlowFall(d, w) {
-    static core := Max(2, Round(3 * A_ScreenDPI / 96))
-    if (d <= -1 || d >= w)
-        return 0
-    rim := d < 0 ? 1 + d : 1, d := Max(d, 0), f := 1 - d / w
-    v := Min(1, 0.9 * f ** 2.2 + (d < core ? 0.4 * (1 - d / core) : 0))
-    return rim * v * (1 + 150 / 255 * (1 - v))
+; A held window let go. Dropped on the dock (target: desktop index, -2 for "+"), it goes there,
+; back where it was picked up, and you stay where you are, like on a Mac. Else it stays on the
+; desktop you ended up on.
+DropWindow(hwnd, target, carried, from) {
+    if (target != -1 && from) {
+        try {
+            if from.max {
+                WinMaximize(hwnd)
+            } else {
+                if (WinGetMinMax(hwnd) = 1)         ; Windows maximized it, dropped near the top
+                    WinRestore(hwnd)
+                WinMove(from.x, from.y, from.w, from.h, hwnd)
+            }
+        }
+    }
+    if desk.Drop(hwnd, target, carried)
+        FocusTopWindow()                            ; it left: the next window here gets the focus
+    else if carried
+        try WinActivate(hwnd)
 }
-
-GlowPeriod2(h) => Round(h * 0.62)                   ; not a simple fraction of h: the mix never repeats the same way
-
-; A premultiplied 32-bit memory DC, w × h, top-down; bits receives the pixel pointer.
-NewDib(w, h, &bits := 0) {
-    bits := 0                                       ; an omitted ByRef parameter starts unset
-    bi := Buffer(40, 0)                             ; BITMAPINFOHEADER, 32 bpp
-    NumPut("UInt", 40, bi, 0), NumPut("Int", w, bi, 4), NumPut("Int", -h, bi, 8)
-    NumPut("UShort", 1, bi, 12), NumPut("UShort", 32, bi, 14)
-    hdc := DllCall("CreateCompatibleDC", "Ptr", 0, "Ptr")
-    hbm := DllCall("CreateDIBSection", "Ptr", hdc, "Ptr", bi, "UInt", 0, "Ptr*", &bits, "Ptr", 0, "UInt", 0, "Ptr")
-    DllCall("SelectObject", "Ptr", hdc, "Ptr", hbm)
-    return hdc
-}
-
-; Where each frame is put together before it goes on screen.
-GlowCanvas(w, h) {
-    static cache := Map()
-    key := w "|" h
-    if !cache.Has(key)
-        cache[key] := NewDib(w, h)
-    return cache[key]
-}
-
-; The glow's colour at position y of a cycle `period` long, starting `shift` colours in: it eases
-; from each of GLOW_COLORS to the next. 0xRRGGBB.
-GlowColorAt(y, period, shift) {
-    n := GLOW_COLORS.Length
-    pos := Mod(Mod(y, period) / period * n + shift, n), i := Floor(pos), k := pos - i
-    k := k * k * (3 - 2 * k)
-    c1 := GLOW_COLORS[i + 1], c2 := GLOW_COLORS[Mod(i + 1, n) + 1]
-    cr := (c1 >> 16) + ((c2 >> 16) - (c1 >> 16)) * k
-    cg := ((c1 >> 8) & 0xFF) + (((c2 >> 8) & 0xFF) - ((c1 >> 8) & 0xFF)) * k
-    cb := (c1 & 0xFF) + ((c2 & 0xFF) - (c1 & 0xFF)) * k
-    return (Round(cr) << 16) | (Round(cg) << 8) | Round(cb)
-}
-
-; Called every frame while the dock is open. edge: +1 = cursor in the right bump, -1 = left bump,
-; 0 = neither. Returns true when it's time to change desktop.
-; Same timing as macOS (Dock's workspaces-edge-delay, 0.75 s): the cursor has to stay there the
-; whole time, leaving starts the count again.
-global EDGE_HOLD_MS := 750
-EdgeHeld(edge) {
-    global edgeSide, edgeSince
-    if (edge != edgeSide)
-        edgeSide := edge, edgeSince := A_TickCount
-    return edge != 0 && A_TickCount - edgeSince >= EDGE_HOLD_MS
-}
-
-; True once a window has been held for BAR_HOLD_MS, moving or not (a quick click on a title bar
-; doesn't count). stillX / stillY: where it was picked up.
-global stillX := 0, stillY := 0, stillSince := 0
-HeldStill() => A_TickCount - stillSince >= BAR_HOLD_MS
 
 MonitorAt(x, y) {
     Loop MonitorGetCount() {
@@ -363,16 +215,12 @@ SaveSetting(key, on, itemName) {
 global moveSizeHook := DllCall("SetWinEventHook", "UInt", 0x000A, "UInt", 0x000B, "Ptr", 0
     , "Ptr", CallbackCreate(OnMoveSize, , 7), "UInt", 0, "UInt", 0, "UInt", 0, "Ptr")   ; out of context
 
-; Windows only announces a drag once the mouse has moved a few pixels. So a window held by its title
-; bar without moving at all is watched from the button press itself: if it stays still long enough,
-; the desktop bar opens. Moving then turns it into a normal drag, and WatchDrag takes over.
-; Title bar only (HTCAPTION): holding the button down in a page or a document stays what it is.
-global pressHwnd := 0
+; A press on a title bar (HTCAPTION) goes to the hold gesture right away, so a window held without
+; moving at all opens the dock too. Holding the button down in a page or a document stays what it is.
 Hotkey("~*LButton", PressStart)                     ; ~: the click goes through untouched
 
 PressStart(*) {
-    global pressHwnd, stillX, stillY, stillSince, dragFrom, barHeld
-    if (!holdOn || !pWinDesk || !pPin || !pUnpin || dragHwnd || pressHwnd || (barShown && !browseOn))
+    if (!holdOn || !desk.CanCarry || hold.phase != "idle" || (barShown && !browseOn))
         return
     CoordMode("Mouse", "Screen")
     MouseGetPos(&x, &y, &under)
@@ -387,14 +235,8 @@ PressStart(*) {
             SetTimer(BarHide, -1)
         return
     }
-    pressHwnd := hwnd, stillX := x, stillY := y, stillSince := A_TickCount
-    if browseOn                                     ; browsing: it glows at once, ready to drop on a desktop
-        barHeld := hwnd, WinGlowShow(hwnd), HeldInFront(hwnd)
-    try {
-        WinGetPos(&fx, &fy, &fw, &fh, hwnd)
-        dragFrom := {max: WinGetMinMax(hwnd) = 1, x: fx, y: fy, w: fw, h: fh}
-    }
-    SetTimer(WatchPress, 15)
+    Perform(hold.Press(hwnd, x, y, A_TickCount, WindowPlace(hwnd), browseOn))
+    SetTimer(HoldTick, 15)
 }
 
 ; The taskbar and its tray (where the icon is), including the overflow under ^.
@@ -408,31 +250,11 @@ OnTaskbar(hwnd) {
         || cls = "TopLevelWindowForOverflowXamlIsland"
 }
 
-WatchPress() {
-    global pressHwnd
-    if dragHwnd {                                   ; it became a drag: WatchDrag carries on, bar included
-        SetTimer(WatchPress, 0), pressHwnd := 0
-        return
-    }
-    if !GetKeyState("LButton", "P") {               ; let go without ever moving: nothing to drop
-        SetTimer(WatchPress, 0), pressHwnd := 0
-        if browseOn
-            WinGlowHide(), HeldBack()               ; browsing: the dock stays, only that window lets go
-        else
-            BarHide()
-        return
-    }
-    if (HeldStill() && !barShown)
-        BarShow(MonitorAt(stillX, stillY), pressHwnd)
-    if barShown
-        BarTrack()                                  ; keeps the glow flowing
-}
-
 ; ---------------------------------------------------------------------
 ;  Desktop bar: hold a window without moving, drop it on a desktop
 ; ---------------------------------------------------------------------
 ; Like the Spaces bar at the top of macOS Mission Control, without the overview: your windows stay
-; where they are. Keep a window held (mouse button down on it) without moving for 0.75 s, and a
+; where they are. Keep a window held (mouse button down on it) for a moment, and a
 ; bar of desktops appears at the bottom of that screen, above the taskbar (the top belongs to Windows'
 ; own snapping), each a live miniature: its wallpaper and its
 ; windows, drawn by Windows itself (DWM thumbnails). On Windows 11 a "+" makes a new desktop. Drop
@@ -440,8 +262,7 @@ WatchPress() {
 ; Dropped anywhere else, it's an ordinary drop and the bar goes away.
 ; The bar is a dark panel with well-rounded corners, the glow's light
 ; flowing all round it for as long as it's open.
-global BAR_HOLD_MS := 300                           ; held this long, moving or not: the dock opens
-global bar := 0, barShown := false, barTiles := [], barThumbs := [], barHover := 0, barHeld := 0
+global bar := 0, barShown := false, barTiles := [], barThumbs := [], barHover := 0, barHeld := 0, barCloseHot := false
 global barBase := {x: 0, y: 0}
 
 ; ---- Browsing: the dock opened by clicking the tray number, with no window in hand ----
@@ -463,27 +284,34 @@ ToggleBrowse(*) {
     if barShown {
         browseOn := true
         DeckDrawOverlay()                           ; with the × now
-        SetTimer(WatchBrowse, 15)
+        SetTimer(HoldTick, 15)
     }
 }
 
-WatchBrowse() {
-    if !browseOn || !barShown {
-        SetTimer(WatchBrowse, 0)
-        return
-    }
-    if (dragHwnd || pressHwnd)                      ; a window in hand: its own watcher draws the dock
-        return
-    BarTrack()
+; The close button of a tile: a small squircle in its top-right corner, in pixels from the tile's
+; top-left. What's drawn (DeckDrawOverlay) and what takes the click (CloseHit) are this one square.
+CloseBox(tile) {
+    s := A_ScreenDPI / 96, size := Round(20 * s), inset := Round(4 * s)
+    return {x: tile.w - size - inset, y: inset, size: size}
 }
 
-; The tile size of the close button's corner, and whether (x, y) is in it.
+; Whether (x, y), on screen, is on a tile's close button (a little margin round it: easier to hit).
 CloseHit(tile, x, y) {
-    if (!pRemove || tile.target < 0 || DesktopCount() < 2)
+    if (!desk.CanRemove || tile.target < 0 || desk.Count() < 2)
         return false
-    c := Round(22 * A_ScreenDPI / 96)
+    b := CloseBox(tile), m := Round(3 * A_ScreenDPI / 96)
     lx := x - barBox.x - tile.x, ly := y - barBox.y - tile.y
-    return lx >= tile.w - c && lx < tile.w && ly >= 0 && ly < c
+    return lx >= b.x - m && lx < b.x + b.size + m && ly >= b.y - m && ly < b.y + b.size + m
+}
+
+; A GDI+ path round a rounded rectangle (corner arcs d across): the squircles and the hover frame.
+RoundPath(x, y, w, h, d) {
+    path := 0
+    DllCall("gdiplus\GdipCreatePath", "Int", 0, "Ptr*", &path)
+    for arc in [[x, y, 180], [x + w - d, y, 270], [x + w - d, y + h - d, 0], [x, y + h - d, 90]]
+        DllCall("gdiplus\GdipAddPathArc", "Ptr", path, "Float", arc[1], "Float", arc[2], "Float", d, "Float", d, "Float", arc[3], "Float", 90)
+    DllCall("gdiplus\GdipClosePathFigure", "Ptr", path)
+    return path
 }
 
 BrowseClick(idx, *) {
@@ -493,26 +321,13 @@ BrowseClick(idx, *) {
     CoordMode("Mouse", "Screen")
     MouseGetPos(&x, &y)
     if CloseHit(tile, x, y) {                       ; ×: close that desktop (its windows go to a neighbour)
-        VdaCall(pRemove, "Int", tile.target, "Int", tile.target > 0 ? tile.target - 1 : 1, "Int")
+        desk.Remove(tile.target)
         SetTimer(BarRefresh, -350)
         return
     }
     target := tile.target
     BarHide()
-    if (target = -2)                                ; +: a new desktop, then there
-        target := NewDesktop(DesktopCount())
-    GoToSliding(target)
-}
-
-; Goes to desktop target with Windows' own slide, one desktop at a time.
-GoToSliding(target) {
-    cur := CurrentDesktop()
-    if (target < 0 || cur < 0 || target = cur)
-        return
-    Loop Abs(target - cur) {
-        Send(target > cur ? "^#{Right}" : "^#{Left}")
-        Sleep(180)
-    }
+    desk.GoTo(target)                               ; +: a new desktop, then there
 }
 
 ; ---- Motion: the dock rises into place when it opens, with a little spring ----
@@ -547,16 +362,16 @@ BarLayout(mon, n) {
 ; shown before the old one goes, so it never blinks.
 BarShow(mon, held, intro := true) {
     global bar, barShown, barTiles, barThumbs, barHover, barBox, deckGeom, deckShownAt, barHeld
-    global barBase, deckRise
+    global barBase, deckRise, deckFade
     ; Uninterruptible: building the dock takes a moment (glass, wallpapers, miniatures), and a timer or
     ; a drag ending must not run in the middle of it (two docks stacked, or one torn down mid-build).
     Critical
     if (intro && barShown)
         return
-    count := DesktopCount(), cur := CurrentDesktop()
+    count := desk.Count(), cur := desk.Current()
     if (count <= 0 || cur < 0)
         return
-    n := count + (pCreate ? 1 : 0)                  ; "+" only where a desktop can be made without going there
+    n := count + (desk.CanCreate ? 1 : 0)           ; "+" only where a desktop can be made without going there
     lay := BarLayout(mon, n), tw := lay.tw, th := lay.th, pad := lay.pad
     MonitorGetWorkArea(mon, , , , &workBottom)      ; at the bottom, just above the taskbar: nothing of Windows' there
     mg := Round(DECK_GLOW * lay.s)                  ; how far the glow reaches out round the deck
@@ -583,9 +398,7 @@ BarShow(mon, held, intro := true) {
         } else {
             hbm := WallBitmap(DesktopWallpaper(i), tw, th)
             ctl := hbm ? bar.AddPicture(at, "HBITMAP:*" hbm) : bar.AddText(at " Background3A3B45")
-            name := DesktopName(i)
-            if (name = "")
-                name := "Desktop " (i + 1)
+            name := desk.Label(i)
         }
         barTiles.Push({x: x, y: pad, w: tw, h: th, target: isNew ? -2 : i, name: name, current: i = cur, ctl: ctl})   ; names: drawn by DeckDrawOverlay
         ctl.OnEvent("Click", BrowseClick.Bind(A_Index))   ; when browsing: go there, or close it
@@ -594,7 +407,7 @@ BarShow(mon, held, intro := true) {
     DllCall("SetWindowRgn", "Ptr", bar.Hwnd, "Ptr", DllCall("CreateRoundRectRgn", "Int", 0, "Int", 0, "Int", lay.bw + 1, "Int", lay.bh + 1
         , "Int", 2 * rad, "Int", 2 * rad, "Ptr"), "Int", false)   ; rounded corners; Windows owns the region now
     bar.Show("NA x" sx " y" sy " w" lay.bw " h" lay.bh)
-    VdaCall(pPin, "Ptr", bar.Hwnd, "Int")           ; on every desktop: it stays put through a switch
+    desk.Pin(bar.Hwnd)                              ; on every desktop: it stays put through a switch
     barBase := {x: bx, y: by}
     barBox := {x: sx, y: sy, w: lay.bw, h: lay.bh, mon: mon, gap: lay.gap, labelH: lay.labelH}
     deckGeom := {x: sx - mg, y: sy - mg, fw: lay.bw + 2 * mg, fh: lay.bh + 2 * mg, bw: lay.bw, bh: lay.bh, rad: rad, mg: mg}
@@ -610,15 +423,12 @@ BarShow(mon, held, intro := true) {
         BumpsOpen()
         WinGlowShow(held)
     }
+    if intro
+        deckFade := 1.0
+    else if (deckFade < 1)
+        DeckOpacity()                               ; a rebuild while a window is over it: see-through at once
     DeckGlowFrame()
-    OnTop(deckGlow)                                 ; the glows stay over the dock
-    Loop 2
-        if bumpVis[A_Index]
-            OnTop(bumpWin[A_Index])
-    static glowPinned := false
-    if !glowPinned
-        glowPinned := VdaCall(pPin, "Ptr", deckGlow.Hwnd, "Int") != -1
-    HeldInFront(held)                               ; the window in hand stays in front of the dock
+    DockOnTop()                                     ; in front of the window in hand, the glows over it
 }
 
 ; ---- Over the dock, the window in hand shrinks to a small picture of itself, like on a Mac ----
@@ -629,18 +439,16 @@ BarShow(mon, held, intro := true) {
 global shrinkGui := Gui("-Caption +AlwaysOnTop +ToolWindow +E0x080800A0"), shrink := 0
 global SHRINK_W := 260                              ; its width over the dock, in pixels at 100 %
 
-ShrinkFrame() {
+ShrinkFrame(x, y) {
     global shrink
-    if !dragHwnd {
+    hwnd := hold.Dragging
+    if !hwnd {
         ShrinkEnd()
         return
     }
-    CoordMode("Mouse", "Screen")
-    MouseGetPos(&x, &y)
-    s := A_ScreenDPI / 96, near := 40 * s
-    over := barShown && x >= barBox.x - near && x < barBox.x + barBox.w + near && y >= barBox.y - near
+    s := A_ScreenDPI / 96, over := DockNear(x, y)
     if (over && !shrink)
-        ShrinkStart(x, y)
+        ShrinkStart(hwnd, x, y)
     if !shrink
         return
     if shrink.fallback {                            ; couldn't picture it: just see-through over the dock
@@ -659,15 +467,15 @@ ShrinkFrame() {
     DllCall("StretchBlt", "Ptr", shrink.canvas, "Int", 0, "Int", 0, "Int", ew, "Int", eh
         , "Ptr", shrink.full, "Int", shrink.ox, "Int", shrink.oy, "Int", shrink.w, "Int", shrink.h, "UInt", 0x00CC0020)
     DllCall("BitBlt", "Ptr", shrink.canvas, "Int", 0, "Int", 0, "Int", ew, "Int", eh, "Ptr", shrink.opaque, "Int", 0, "Int", 0, "UInt", 0x00EE0086)   ; SRCPAINT: alpha 255
-    GlowPut(shrinkGui, Round(x - ew * shrink.fx), Round(y - eh * shrink.fy), ew, eh, shrink.canvas
+    LayeredPut(shrinkGui, Round(x - ew * shrink.fx), Round(y - eh * shrink.fy), ew, eh, shrink.canvas
         , Round(255 - 75 * e))                      ; a little see-through when small: the desktop under it shows
     if !shrink.shown
-        OnTop(shrinkGui), shrink.shown := true
+        OnTop(shrinkGui), shrink.shown := true, DockOnTop()   ; the dock stays in front of it
 }
 
-ShrinkStart(x, y) {
+ShrinkStart(hwnd, x, y) {
     global shrink
-    hwnd := dragHwnd, cls := ""
+    cls := ""
     try {
         cls := WinGetClass(hwnd)
         if (WinGetExStyle(hwnd) & 0x80000)          ; layered already (draws its own transparency): leave it alone
@@ -729,41 +537,51 @@ ShrinkEnd() {
     shrink := 0
 }
 
-OnExit((*) => (ShrinkEnd(), HeldBack()))           ; never leave a window see-through or on top behind us
+OnExit((*) => ShrinkEnd())                         ; never leave a window see-through behind us
 
-; Frees a memory DC made by NewDib, and its bitmap.
-FreeDib(hdc) {
-    hbm := DllCall("GetCurrentObject", "Ptr", hdc, "UInt", 7, "Ptr")   ; OBJ_BITMAP
-    DllCall("DeleteDC", "Ptr", hdc), DllCall("DeleteObject", "Ptr", hbm)
-}
+; ---- The dock stays in front of everything, and turns see-through under a window in hand ----
+; From the back: the window in hand (or its shrinking picture), the dock, its glow, the bumps.
+; With a window held over it, the dock fades to DECK_SEE, miniatures and glow included, so you see
+; what you're carrying under it; it comes back when the window leaves.
+global deckFade := 1.0, DECK_SEE := 0.45
 
-; The window in your hand goes in front of the dock (always on top, for as long as it's held); it
-; gets its own setting back on release. Windows that were always on top already are left alone.
-global heldTop := 0
-HeldInFront(hwnd) {
-    global heldTop
-    if !hwnd
+DockOnTop() {
+    if !barShown
         return
-    if (heldTop != hwnd) {
-        HeldBack()
-        try {
-            if (WinGetExStyle(hwnd) & 0x8)          ; already always on top: nothing to undo later
-                heldTop := -hwnd
-            else
-                heldTop := hwnd
-        }
-    }
-    DllCall("SetWindowPos", "Ptr", hwnd, "Ptr", -1, "Int", 0, "Int", 0, "Int", 0, "Int", 0, "UInt", 0x13)   ; TOPMOST, top of them; NOSIZE|NOMOVE|NOACTIVATE
-    Loop 2
-        if bumpVis[A_Index]
-            OnTop(bumpWin[A_Index])                 ; the bumps stay visible over it
+    DllCall("SetWindowPos", "Ptr", bar.Hwnd, "Ptr", -1, "Int", 0, "Int", 0, "Int", 0, "Int", 0, "UInt", 0x13)   ; TOPMOST, top of them; NOSIZE|NOMOVE|NOACTIVATE
+    deckGlow.Raise()
+    for b in bumpGlow
+        if b.visible
+            b.Raise()
 }
 
-HeldBack() {
-    global heldTop
-    if (heldTop > 0)
-        DllCall("SetWindowPos", "Ptr", heldTop, "Ptr", -2, "Int", 0, "Int", 0, "Int", 0, "Int", 0, "UInt", 0x13)   ; NOTOPMOST
-    heldTop := 0
+; The cursor on the dock, or close to it (anywhere below its top, give or take 40 px).
+DockNear(x, y) {
+    near := 40 * A_ScreenDPI / 96
+    return barShown && x >= barBox.x - near && x < barBox.x + barBox.w + near && y >= barBox.y - near
+}
+
+; Every frame: eases the dock's opacity towards see-through (a window in hand over it) or solid.
+DeckSeeThrough(x, y) {
+    global deckFade
+    want := (hold.hwnd && DockNear(x, y)) ? DECK_SEE : 1
+    if (deckFade = want)
+        return
+    deckFade += (want - deckFade) * 0.3
+    if (Abs(want - deckFade) < 0.02)
+        deckFade := want
+    DeckOpacity()
+}
+
+; Puts deckFade on the dock window and its miniatures (DWM draws those itself, so they're told apart).
+; The glow round it takes it at its next frame.
+DeckOpacity() {
+    a := Round(255 * deckFade)
+    try WinSetTransparent(a, bar.Hwnd)
+    props := Buffer(48, 0)                          ; DWM_THUMBNAIL_PROPERTIES: opacity only
+    NumPut("UInt", 0x4, props, 0), NumPut("UChar", a, props, 36)
+    for thumb in barThumbs
+        DllCall("dwmapi\DwmUpdateThumbnailProperties", "Ptr", thumb, "Ptr", props, "Int")
 }
 
 ; After a desktop switch: the dock shows the new current desktop (and the new one, if one was made).
@@ -788,7 +606,7 @@ BarMiniatures(count, lay, held) {                   ; held: the window in your h
         DllCall("dwmapi\DwmGetWindowAttribute", "Ptr", hwnd, "UInt", 14, "Ptr", cloak, "UInt", 4, "Int")
         if (NumGet(cloak, "UInt") & 1)              ; 1 = hidden by the app itself (Store apps in the background)
             continue
-        d := VdaCall(pWinDesk, "Ptr", hwnd, "Int")
+        d := desk.WindowDesktop(hwnd)
         if (d < 0 || d >= count)
             continue
         try WinGetPos(&wx, &wy, &ww, &wh, hwnd)
@@ -811,13 +629,14 @@ BarMiniatures(count, lay, held) {                   ; held: the window in your h
     }
 }
 
-; Every 15 ms while the bar is up: frame the tile under the cursor. The bar stays until the drop.
+; One frame of the open dock, cursor at (x, y): its motion, its glow, the bumps, the shrinking
+; window, and the frame round the tile under the cursor. Returns the side bump the cursor is in.
 ; On a slow PC (or one that's busy for a while) a frame can take longer than the 15 ms between two:
 ; then the glows round the dock and the window are redrawn every other frame only (the bumps, which
 ; do the switching, still every frame), until frames are quick again. Decided from the average
 ; time of the last full frames.
-BarTrack() {
-    global barHover
+BarTrack(x, y) {
+    global barHover, barCloseHot
     static freq := 0, avg := 0, odd := false, autoLite := false
     if !freq
         DllCall("QueryPerformanceFrequency", "Int64*", &freq)
@@ -830,51 +649,26 @@ BarTrack() {
         DeckGlowFrame()
         WinGlowFrame()
     }
-    BumpFrame()
-    ShrinkFrame()
+    edge := BumpFrame(x, y)
+    ShrinkFrame(x, y)
+    DeckSeeThrough(x, y)
     DllCall("QueryPerformanceCounter", "Int64*", &t1 := 0)
     ms := (t1 - t0) * 1000 / freq
     if (full && ms < 40)                            ; full frames only (else skipping would hide the load); one-offs don't count
         avg += (ms - avg) * 0.1
-    CoordMode("Mouse", "Screen")
-    MouseGetPos(&x, &y)
     box := barBox, hit := 0, half := box.gap // 2
     for tile in barTiles
         if (x >= box.x + tile.x - half && x < box.x + tile.x + tile.w + half && y >= box.y - half)   ; anywhere below the bar's top
             hit := A_Index
-    SpringHover(hit)
-    if (hit = barHover)
-        return
-    barHover := hit
-    DeckDrawOverlay()                               ; the frame moves to the tile under the cursor
+    hot := browseOn && hit && CloseHit(barTiles[hit], x, y)   ; on a close button: it lights up
+    if (hit != barHover || hot != barCloseHot) {
+        barHover := hit, barCloseHot := hot
+        DeckDrawOverlay()                           ; the frame moves to the tile under the cursor
+    }
+    return edge
 }
 
-; A window held over a desktop in the dock for a second: you slide there, the window still in your
-; hand (it's pinned for the drag), and the dock shows where you are. Over "+": a new desktop, then there.
-SpringHover(hit) {
-    static on := 0, since := 0
-    if (!dragHwnd || !hit) {
-        on := 0
-        return
-    }
-    if (barTiles[hit].target = CurrentDesktop()) {  ; already there
-        on := 0
-        return
-    }
-    if (hit != on) {
-        on := hit, since := A_TickCount
-        return
-    }
-    if (A_TickCount - since < 1000)
-        return
-    on := 0, target := barTiles[hit].target
-    if (target = -2)
-        target := NewDesktop(DesktopCount())
-    GoToSliding(target)
-    SetTimer(BarRefresh, -450)
-}
-
-; The desktop under the cursor when the window is dropped: its index, -2 for "+", -1 for none.
+; The desktop under the cursor in the dock: its index, -2 for "+", -1 for none.
 BarTarget() => barShown && barHover ? barTiles[barHover].target : -1
 
 BarHide() {
@@ -890,7 +684,6 @@ BarHide() {
     BumpsHide()
     WinGlowHide()
     ShrinkEnd()
-    HeldBack()
     SetTimer(BarRefresh, 0)
     bar := 0, barShown := false, barTiles := [], barThumbs := [], barHover := 0
 }
@@ -940,147 +733,38 @@ WallBitmap(path, w, h) {
     return hbm
 }
 
-; Scaling big wallpapers takes a moment: done ahead of time, so the bar shows at once.
+; Scaling big wallpapers and making the glows' masks takes a moment: done ahead of time, so the
+; dock shows at once.
 WarmBar() {
-    if !pWinDesk || (count := DesktopCount()) <= 0
+    if !desk.CanCarry || (count := desk.Count()) <= 0
         return
-    lay := BarLayout(MonitorGetPrimary(), count + (pCreate ? 1 : 0))
+    lay := BarLayout(MonitorGetPrimary(), count + (desk.CanCreate ? 1 : 0))
     Loop count
         WallBitmap(DesktopWallpaper(A_Index - 1), lay.tw, lay.th)
-    mg := Round(DECK_GLOW * lay.s), fw := lay.bw + 2 * mg, fh := lay.bh + 2 * mg
-    DeckMasks(fw, fh, lay.bw, lay.bh, DeckRadius(lay), mg)
-    DeckStrip(fw, fh, fw, 0), DeckStrip(fw, fh, GlowPeriod2(fw), GLOW_COLORS.Length // 2)
-    Loop BUMP_LEVELS
-        BumpMasks(A_Index - 1)
-    bh := BumpGeom().bh
-    BumpStrip(bh, 0), BumpStrip(GlowPeriod2(bh), GLOW_COLORS.Length // 2), BumpWhite()
+    deckGlow.Warm(DeckMask(lay.bw, lay.bh, DeckRadius(lay), Round(DECK_GLOW * lay.s)))
+    Loop BUMP_LEVELS {
+        BumpMask(A_Index - 1, -1)
+        bumpGlow[2].Warm(BumpMask(A_Index - 1, 1))
+    }
 }
 
 ; ---- The deck: its outline and its glow ----
-global deckGlow := Gui("-Caption +AlwaysOnTop +ToolWindow +E0x080800A0")   ; LAYERED | TRANSPARENT | NOACTIVATE | TOOLWINDOW
+global deckGlow := GlowShape("x")                   ; the colours flow along the dock
 global deckGeom := {x: 0, y: 0, fw: 0, fh: 0, bw: 0, bh: 0, rad: 0, mg: 0}, deckShownAt := 0
 global DECK_N := 2                                  ; corner shape: 2 = circle arcs, like Windows' own
 global DECK_GLOW := 7                               ; how far the haze reaches out round the deck, in pixels at 100 %
 
 DeckRadius(lay) => Round(lay.bh * 0.24)             ; well rounded, growing with the dock
+DeckMask(bw, bh, rad, mg) => GlowRoundRect(bw, bh, rad, mg, DECK_N)
 
-; The glow's brightness round the deck as two masks, fw × fh (the deck plus a margin mg all round),
-; built once per size: bright on the dock's edge, a wide haze outside, a few pixels inside that
-; cover the region's hard edge. "inv" is black with alpha 1 - m, "keep" white with alpha m.
-; A frame is colours × m without touching a pixel from here: AlphaBlend inv over the opaque colours
-; (each pixel becomes m × colour, alpha 255), then AND keep, which sets the alpha byte to m.
-DeckMasks(fw, fh, bw, bh, rad, mg) {
-    static cache := Map()
-    key := fw "|" fh "|" rad "|" mg
-    if cache.Has(key)
-        return cache[key]
-    inv := NewDib(fw, fh, &ib), keep := NewDib(fw, fh, &kb)
-    Fill32(ib, fw * fh, 0xFF000000), Fill32(kb, fw * fh, 0x00FFFFFF)   ; m = 0 everywhere to start
-    inner := Max(2, Round(5 * A_ScreenDPI / 96)), ex := DECK_N
-    hx := bw / 2 - rad, hy := bh / 2 - rad, cx := fw / 2, cy := fh / 2
-    MaskAt(px, py) {                                ; m (0-255) at the centre of pixel (px, py)
-        qx := Abs(px + 0.5 - cx) - hx, qy := Abs(py + 0.5 - cy) - hy
-        if (qx > 0 && qy > 0) {                     ; in a corner: the superellipse's own measure, divided by its
-            lp := (qx ** ex + qy ** ex) ** (1 / ex) ; slope so it's a true distance (raw, it's ~20 % short at 45°
-            gx := (qx / lp) ** (ex - 1), gy := (qy / lp) ** (ex - 1)   ; and the haze bulges out at the corners)
-            d := (lp - rad) / Sqrt(gx * gx + gy * gy)
-        } else {
-            d := Max(qx, qy) - rad                  ; along a side: straight distance from the edge
-        }
-        v := d >= 0 ? GlowFall(d, mg) : d > -inner ? GlowFall(0, mg) * (1 + d / inner) : 0
-        return Round(255 * Min(1, v))
-    }
-    MaskPut(px, py, m) {
-        o := (py * fw + px) * 4
-        NumPut("UInt", (255 - m) << 24, ib, o), NumPut("UInt", (m << 24) | 0xFFFFFF, kb, o)
-    }
-    cs := mg + rad                                  ; corner box: from the frame's edge to where the sides go straight
-    Loop cs {                                       ; the four corners, mirrored from the top-left one
-        j := A_Index - 1
-        Loop cs {
-            i := A_Index - 1, m := MaskAt(i, j)
-            if m
-                MaskPut(i, j, m), MaskPut(fw - 1 - i, j, m), MaskPut(i, fh - 1 - j, m), MaskPut(fw - 1 - i, fh - 1 - j, m)
-        }
-    }
-    Loop cs {                                       ; top and bottom: the same all along a row
-        j := A_Index - 1, m := MaskAt(fw // 2, j)
-        if !m
-            continue
-        for row in [j, fh - 1 - j] {
-            Fill32(ib + (row * fw + cs) * 4, fw - 2 * cs, (255 - m) << 24)
-            Fill32(kb + (row * fw + cs) * 4, fw - 2 * cs, (m << 24) | 0xFFFFFF)
-        }
-    }
-    if (fh > 2 * cs) {                              ; left and right: the same all down a column
-        Loop cs {
-            i := A_Index - 1, m := MaskAt(i, fh // 2)
-            if m
-                MaskPut(i, cs, m), MaskPut(fw - 1 - i, cs, m)
-        }
-        Loop fh - 2 * cs - 1 {
-            row := cs + A_Index
-            for side in [0, fw - cs]
-                for base in [ib, kb]
-                    DllCall("RtlMoveMemory", "Ptr", base + (row * fw + side) * 4, "Ptr", base + (cs * fw + side) * 4, "UPtr", cs * 4)
-        }
-    }
-    cache[key] := {inv: inv, keep: keep}
-    return cache[key]
-}
-
-; Sets count 32-bit pixels from ptr to value, by doubling copies.
-Fill32(ptr, count, value) {
-    if (count <= 0)
-        return
-    NumPut("UInt", value, ptr)
-    done := 1
-    while (done < count) {
-        n := Min(done, count - done)
-        DllCall("RtlMoveMemory", "Ptr", ptr + done * 4, "Ptr", ptr, "UPtr", n * 4)
-        done += n
-    }
-}
-
-; Opaque colour bands, fw + period wide and fh tall, the colours cycling once per period across:
-; a frame takes an fw-wide slice at a moving offset, like the edge glow's layers but sideways.
-DeckStrip(fw, fh, period, shift) {
-    static cache := Map()
-    key := fw "|" fh "|" period "|" shift
-    if cache.Has(key)
-        return cache[key]
-    total := fw + period
-    dc := NewDib(total, fh, &bits)
-    Loop total
-        NumPut("UInt", 0xFF000000 | GlowColorAt(A_Index - 1, period, shift), bits, (A_Index - 1) * 4)
-    Loop fh - 1
-        DllCall("RtlMoveMemory", "Ptr", bits + A_Index * total * 4, "Ptr", bits, "UPtr", total * 4)
-    cache[key] := {dc: dc}
-    return cache[key]
-}
-
-; One frame of the glow round the deck: two colour layers sliding in opposite directions, mixed,
-; then shaped by the masks. Four GDI calls, whatever the deck's size.
+; One frame of the glow round the deck, with the names and the hover frame over it.
 DeckGlowFrame() {
     if !barShown
         return
-    g := deckGeom, fw := g.fw, fh := g.fh, p2 := GlowPeriod2(fw)
-    masks := DeckMasks(fw, fh, g.bw, g.bh, g.rad, g.mg)
-    sa := DeckStrip(fw, fh, fw, 0), sb := DeckStrip(fw, fh, p2, GLOW_COLORS.Length // 2)
-    xa := fw - Mod(A_TickCount * fw // GLOW_FLOW_MS, fw)        ; flows right
-    xb := Mod(A_TickCount * p2 // GLOW_FLOW2_MS, p2)             ; flows left
-    canvas := GlowCanvas(fw, fh)
-    DllCall("BitBlt", "Ptr", canvas, "Int", 0, "Int", 0, "Int", fw, "Int", fh, "Ptr", sa.dc, "Int", xa, "Int", 0, "UInt", 0x00CC0020)
-    DllCall("msimg32\AlphaBlend", "Ptr", canvas, "Int", 0, "Int", 0, "Int", fw, "Int", fh
-        , "Ptr", sb.dc, "Int", xb, "Int", 0, "Int", fw, "Int", fh, "UInt", 150 << 16)                 ; mixed in at 150/255
-    DllCall("msimg32\AlphaBlend", "Ptr", canvas, "Int", 0, "Int", 0, "Int", fw, "Int", fh
-        , "Ptr", masks.inv, "Int", 0, "Int", 0, "Int", fw, "Int", fh, "UInt", (1 << 24) | (255 << 16)) ; × m
-    DllCall("BitBlt", "Ptr", canvas, "Int", 0, "Int", 0, "Int", fw, "Int", fh, "Ptr", masks.keep, "Int", 0, "Int", 0, "UInt", 0x008800C6)   ; SRCAND: alpha = m
-    if (deckOverlay && deckOverlay.fw = fw && deckOverlay.fh = fh)   ; the names and the frame, over it all
-        DllCall("msimg32\AlphaBlend", "Ptr", canvas, "Int", 0, "Int", 0, "Int", fw, "Int", fh
-            , "Ptr", deckOverlay.dc, "Int", 0, "Int", 0, "Int", fw, "Int", fh, "UInt", (1 << 24) | (255 << 16))
-    k := Min(1, (A_TickCount - deckShownAt) / 200)
-    GlowPut(deckGlow, g.x, g.y, fw, fh, canvas, Round(240 * k * k * (3 - 2 * k)))
+    g := deckGeom, mask := DeckMask(g.bw, g.bh, g.rad, g.mg)
+    over := (deckOverlay && deckOverlay.fw = mask.w && deckOverlay.fh = mask.h) ? deckOverlay.dc : 0
+    k := Min(1, (A_TickCount - deckShownAt) / 200)  ; fades in as it rises
+    deckGlow.Draw(mask, g.x, g.y, Round(240 * k * k * (3 - 2 * k) * deckFade), {over: over})   ; see-through with the dock
 }
 
 
@@ -1128,31 +812,41 @@ DeckDrawOverlay() {
         DllCall("gdiplus\GdipDeleteBrush", "Ptr", brush), DllCall("gdiplus\GdipDeleteFont", "Ptr", font)
     }
     if barHover {                                   ; the frame round the tile under the cursor
-        tile := barTiles[barHover], e := 3 * s, d := 16 * s, pen := 0, path := 0
-        x := g.mg + tile.x - e, y := g.mg + tile.y - e, w := tile.w + 2 * e, h := tile.h + 2 * e
+        tile := barTiles[barHover], e := 3 * s, pen := 0
         DllCall("gdiplus\GdipCreatePen1", "UInt", 0xFF4A9BE0, "Float", 2.5 * s, "Int", 2, "Ptr*", &pen)
-        DllCall("gdiplus\GdipCreatePath", "Int", 0, "Ptr*", &path)
-        for arc in [[x, y, 180], [x + w - d, y, 270], [x + w - d, y + h - d, 0], [x, y + h - d, 90]]
-            DllCall("gdiplus\GdipAddPathArc", "Ptr", path, "Float", arc[1], "Float", arc[2], "Float", d, "Float", d, "Float", arc[3], "Float", 90)
-        DllCall("gdiplus\GdipClosePathFigure", "Ptr", path)
+        path := RoundPath(g.mg + tile.x - e, g.mg + tile.y - e, tile.w + 2 * e, tile.h + 2 * e, 16 * s)
         DllCall("gdiplus\GdipDrawPath", "Ptr", gfx, "Ptr", pen, "Ptr", path)
         DllCall("gdiplus\GdipDeletePath", "Ptr", path), DllCall("gdiplus\GdipDeletePen", "Ptr", pen)
-        if (browseOn && pRemove && tile.target >= 0 && barTiles.Length > (pCreate ? 2 : 1)) {   ; browsing: × to close it
-            c := 22 * s, cx := g.mg + tile.x + tile.w - c / 2 - 3 * s, cy := g.mg + tile.y + c / 2 + 3 * s, rr := 8 * s
-            dot := 0, xp := 0
-            DllCall("gdiplus\GdipCreateSolidFill", "UInt", 0xE616171C, "Ptr*", &dot)
-            DllCall("gdiplus\GdipFillEllipse", "Ptr", gfx, "Ptr", dot, "Float", cx - rr, "Float", cy - rr, "Float", 2 * rr, "Float", 2 * rr)
-            DllCall("gdiplus\GdipCreatePen1", "UInt", 0xFFFFFFFF, "Float", 1.6 * s, "Int", 2, "Ptr*", &xp)
-            k := 3.2 * s
-            DllCall("gdiplus\GdipDrawLine", "Ptr", gfx, "Ptr", xp, "Float", cx - k, "Float", cy - k, "Float", cx + k, "Float", cy + k)
-            DllCall("gdiplus\GdipDrawLine", "Ptr", gfx, "Ptr", xp, "Float", cx + k, "Float", cy - k, "Float", cx - k, "Float", cy + k)
-            DllCall("gdiplus\GdipDeletePen", "Ptr", xp), DllCall("gdiplus\GdipDeleteBrush", "Ptr", dot)
-        }
+        if (browseOn && desk.CanRemove && tile.target >= 0 && barTiles.Length > (desk.CanCreate ? 2 : 1))   ; browsing: × to close it
+            DrawCloseButton(gfx, tile, g.mg, s, barCloseHot)
     }
     DllCall("gdiplus\GdipDeleteStringFormat", "Ptr", fmt), DllCall("gdiplus\GdipDeleteFontFamily", "Ptr", fam)
     DllCall("gdiplus\GdipDeleteGraphics", "Ptr", gfx), DllCall("gdiplus\GdipDisposeImage", "Ptr", bmp)
     deckOverlay := o
 }
+
+; A tile's close button: a dark squircle with a white ×. Under the cursor it lights up like the
+; desktop number does on a switch: the glow's blue round it, a soft haze outside, so you see
+; exactly where the click goes.
+DrawCloseButton(gfx, tile, mg, s, lit) {
+    b := CloseBox(tile), x := mg + tile.x + b.x, y := mg + tile.y + b.y, sz := b.size, d := sz * 0.6
+    path := RoundPath(x, y, sz, sz, d), brush := 0, pen := 0, xp := 0
+    if lit {                                        ; the haze, then the bright rim
+        DllCall("gdiplus\GdipCreatePen1", "UInt", 0x702A82CC, "Float", 5 * s, "Int", 2, "Ptr*", &pen)
+        DllCall("gdiplus\GdipDrawPath", "Ptr", gfx, "Ptr", pen, "Ptr", path), DllCall("gdiplus\GdipDeletePen", "Ptr", pen)
+    }
+    DllCall("gdiplus\GdipCreateSolidFill", "UInt", lit ? 0xFF0063B1 : 0xE616171C, "Ptr*", &brush)
+    DllCall("gdiplus\GdipFillPath", "Ptr", gfx, "Ptr", brush, "Ptr", path), DllCall("gdiplus\GdipDeleteBrush", "Ptr", brush)
+    DllCall("gdiplus\GdipCreatePen1", "UInt", lit ? 0xFF8CC0EC : 0x50FFFFFF, "Float", (lit ? 1.8 : 1) * s, "Int", 2, "Ptr*", &pen)
+    DllCall("gdiplus\GdipDrawPath", "Ptr", gfx, "Ptr", pen, "Ptr", path), DllCall("gdiplus\GdipDeletePen", "Ptr", pen)
+    DllCall("gdiplus\GdipDeletePath", "Ptr", path)
+    cx := x + sz / 2, cy := y + sz / 2, k := 3.2 * s
+    DllCall("gdiplus\GdipCreatePen1", "UInt", 0xFFFFFFFF, "Float", 1.6 * s, "Int", 2, "Ptr*", &xp)
+    DllCall("gdiplus\GdipDrawLine", "Ptr", gfx, "Ptr", xp, "Float", cx - k, "Float", cy - k, "Float", cx + k, "Float", cy + k)
+    DllCall("gdiplus\GdipDrawLine", "Ptr", gfx, "Ptr", xp, "Float", cx + k, "Float", cy - k, "Float", cx - k, "Float", cy + k)
+    DllCall("gdiplus\GdipDeletePen", "Ptr", xp)
+}
+
 ; ---- The side bumps: where you take the window to the previous / next desktop ----
 ; While the dock is open, a small glowing bump sits on each side of the screen, half-way down.
 ; Bring the window towards a side and that bump swells,
@@ -1161,11 +855,11 @@ DeckDrawOverlay() {
 ; you slide to that desktop, window in hand, and it gives a little bounce. Windows' Snap still works
 ; all along: let go against the edge before the 0.75 s and the window snaps there. On desktop 1 there's no
 ; left bump: nothing that way. Past the last desktop, the right one makes a new desktop.
-; Shape: a bell, depth × (1 - u²)² across ±half (u = -1…1 along the edge), filled, with the glow's
-; haze round it. Its size follows q = closeness (+ bounce): BUMP_LEVELS masks, made once.
-global bumpWin := [Gui("-Caption +AlwaysOnTop +ToolWindow +E0x080800A0"), Gui("-Caption +AlwaysOnTop +ToolWindow +E0x080800A0")]
-global bumpVis := [false, false], bumpShown := false, bumpOpenAt := 0
-global bumpY := [0, 0], bumpSquash := [0, 0], bumpAvail := [0, 1]   ; [left, right]
+; Shape: a bell (GlowBell), filled, with the glow's haze round it. Its size follows q = closeness
+; (+ bounce): BUMP_LEVELS masks, made once.
+global bumpGlow := [GlowShape("y", 2, 100), GlowShape("y", 2, 100)]   ; [left, right]: slower light, back on top every 100 ms
+global bumpShown := false, bumpOpenAt := 0
+global bumpSquash := [0, 0], bumpAvail := [0, 1]    ; [left, right]
 global BUMP_LEVELS := 15, BUMP_QMAX := 1.4, BUMP_GLOW := 10, BUMP_REACH := 200
 
 BumpDepth(q) => (5 + 15 * q * q) * A_ScreenDPI / 96                 ; how far it sticks out
@@ -1185,55 +879,10 @@ BumpGeom() {
     return g
 }
 
-; The masks for size level k (0 … BUMP_LEVELS - 1), left and right (mirrored), as DeckMasks makes
-; them: inv = black with alpha 1 - m, keep = white with alpha m.
-BumpMasks(k) {
-    static cache := Map()
-    if cache.Has(k)
-        return cache[k]
-    g := BumpGeom(), bw := g.bw, bh := g.bh
-    q := k / (BUMP_LEVELS - 1) * BUMP_QMAX, depth := BumpDepth(q), half := BumpHalf(q)
-    linv := NewDib(bw, bh, &lib), lkeep := NewDib(bw, bh, &lkb), rinv := NewDib(bw, bh, &rib), rkeep := NewDib(bw, bh, &rkb)
-    Fill32(lib, bw * bh, 0xFF000000), Fill32(rib, bw * bh, 0xFF000000)
-    Fill32(lkb, bw * bh, 0x00FFFFFF), Fill32(rkb, bw * bh, 0x00FFFFFF)
-    Loop bh // 2 {                                  ; the top half, mirrored to the bottom
-        j := A_Index - 1, u := (bh / 2 - j - 0.5) / half
-        if (u >= 1)
-            continue
-        e := 1 - u * u, xb := depth * e * e         ; the bump's outline at this row
-        slope := 4 * depth * u * e / half, norm := Sqrt(1 + slope * slope)
-        fade := Min(1, (1 - u) * 4), fade := fade * fade * (3 - 2 * fade)   ; its ends melt into the edge
-        Loop bw {
-            c := A_Index - 1, d := (c + 0.5 - xb) / norm   ; distance from the outline, outward
-            m := Round(255 * fade * (d < 0 ? 1 : GlowFall(d, g.mg)))
-            if !m {
-                if (d > 0)
-                    break                           ; only darker further out
-                continue
-            }
-            for row in [j, bh - 1 - j] {
-                ol := (row * bw + c) * 4, orr := (row * bw + bw - 1 - c) * 4
-                NumPut("UInt", (255 - m) << 24, lib, ol), NumPut("UInt", (m << 24) | 0xFFFFFF, lkb, ol)
-                NumPut("UInt", (255 - m) << 24, rib, orr), NumPut("UInt", (m << 24) | 0xFFFFFF, rkb, orr)
-            }
-        }
-    }
-    cache[k] := {l: {inv: linv, keep: lkeep}, r: {inv: rinv, keep: rkeep}}
-    return cache[k]
-}
-
-; Opaque colour bands for the bumps, the colours changing down the rows, period rows a cycle.
-BumpStrip(period, shift) {
-    static cache := Map()
-    key := period "|" shift
-    if cache.Has(key)
-        return cache[key]
-    g := BumpGeom(), total := g.bh + period
-    dc := NewDib(g.bw, total, &bits)
-    Loop total
-        Fill32(bits + (A_Index - 1) * g.bw * 4, g.bw, 0xFF000000 | GlowColorAt(A_Index - 1, period, shift))
-    cache[key] := {dc: dc}
-    return cache[key]
+; The mask for size level k (0 … BUMP_LEVELS - 1), on the left (side -1) or right (+1) edge.
+BumpMask(k, side) {
+    g := BumpGeom(), q := k / (BUMP_LEVELS - 1) * BUMP_QMAX
+    return GlowBell(g.bw, g.bh, BumpDepth(q), BumpHalf(q), g.mg, side)
 }
 
 BumpPlus() {                                        ; the "+" on the last desktop's bump: dark, opaque, made once
@@ -1252,101 +901,57 @@ BumpPlus() {                                        ; the "+" on the last deskto
     return p
 }
 
-BumpWhite() {                                       ; for the light that fills a bump you hold
-    static dc := 0
-    if !dc {
-        g := BumpGeom()
-        dc := NewDib(g.bw, g.bh, &bits)
-        Fill32(bits, g.bw * g.bh, 0xFFFFFFFF)
-    }
-    return dc
-}
-
 BumpsOpen() {
-    global bumpY, bumpSquash, bumpAvail, bumpOpenAt, bumpShown, edgeSide
-    CoordMode("Mouse", "Screen")
-    MouseGetPos(, &y)
-    bumpY := [y, y], bumpSquash := [0, 0], bumpAvail := [CurrentDesktop() > 0 ? 1 : 0, 1]
-    bumpOpenAt := A_TickCount, edgeSide := 0, bumpShown := true
+    global bumpSquash, bumpAvail, bumpOpenAt, bumpShown
+    bumpSquash := [0, 0], bumpAvail := [desk.Current() > 0 ? 1 : 0, 1]
+    bumpOpenAt := A_TickCount, bumpShown := true
 }
 
 BumpsHide() {
-    global bumpShown, bumpVis, edgeSide
-    Loop 2
-        bumpWin[A_Index].Hide()
-    bumpVis := [false, false], bumpShown := false, edgeSide := 0
+    global bumpShown
+    for b in bumpGlow
+        b.Hide()
+    bumpShown := false
 }
 
-; One frame of both bumps, and the desktop switch when the cursor has held one long enough.
-BumpFrame() {
-    global bumpY, bumpSquash, bumpAvail, edgeSince
+; One frame of both bumps, cursor at (x, y). Returns the side the cursor is in (-1 left, +1 right,
+; 0 neither): held there with a window, the hold gesture switches desktop.
+BumpFrame(x, y) {
+    global bumpSquash, bumpAvail
     if !bumpShown
-        return
+        return 0
     g := BumpGeom(), now := A_TickCount
-    CoordMode("Mouse", "Screen")
-    MouseGetPos(&x, &y)
     MonitorGetWorkArea(barBox.mon, &wl, &wt, &wr, &wb)
-    cur := CurrentDesktop(), count := DesktopCount()
+    cur := desk.Current(), count := desk.Count()
     yc := (wt + wb) / 2                             ; fixed, half-way down the screen
     contact := 0
     Loop 2 {
         i := A_Index, side := i = 1 ? -1 : 1
-        bumpY[i] := yc
         bumpAvail[i] += ((side < 0 ? cur > 0 : 1) - bumpAvail[i]) * 0.12   ; desktop 1: the left one tucks away
         dist := side < 0 ? x - wl : wr - 1 - x
         near := Max(0, Min(1, 1 - dist / (BUMP_REACH * g.s))), p := 1 - (1 - near) ** 3
         grow := BumpSpring((now - bumpOpenAt - 120 - (i - 1) * 60) / 600) * bumpAvail[i]
         bumpSquash[i] *= 0.88
         q := Min(BUMP_QMAX, Max(0, (p + 0.4 * bumpSquash[i]) * grow))
-        if (dragHwnd && bumpAvail[i] > 0.5 && dist >= -1 && dist <= BumpDepth(q) + 2 * g.s)
+        if (bumpAvail[i] > 0.5 && dist >= -1 && dist <= BumpDepth(q) + 2 * g.s)
             contact := side
         alpha := Round(255 * (0.45 + 0.55 * p) * Min(1, Max(0, grow) * 1.5))
         if (alpha < 3) {
-            if bumpVis[i]
-                bumpWin[i].Hide(), bumpVis[i] := false
+            if bumpGlow[i].visible
+                bumpGlow[i].Hide()
             continue
         }
-        fill := (edgeSide = side && edgeSince) ? Min(1, (now - edgeSince) / EDGE_HOLD_MS) : 0
+        stamp := 0
         plus := (side > 0 && cur + 1 >= count) ? Min(1, Max(0, (q - 0.45) / 0.4)) : 0   ; last desktop: this one makes a new one
-        BumpDraw(i, side, Round(q / BUMP_QMAX * (BUMP_LEVELS - 1)), fill, alpha
-            , side < 0 ? wl : wr - g.bw, Round(bumpY[i] - g.bh / 2), plus, BumpDepth(q))
+        if (plus > 0) {                             ; a black "+" in the bump's belly
+            pl := BumpPlus(), cx := side > 0 ? g.bw - BumpDepth(q) * 0.55 : BumpDepth(q) * 0.55
+            stamp := {dc: pl.dc, size: pl.size, x: Round(cx - pl.size / 2), y: (g.bh - pl.size) // 2, alpha: Round(255 * plus)}
+        }
+        bumpGlow[i].Draw(BumpMask(Round(q / BUMP_QMAX * (BUMP_LEVELS - 1)), side)
+            , side < 0 ? wl : wr - g.bw, Round(yc - g.bh / 2), alpha
+            , {white: hold.EdgeFill(side, now), stamp: stamp})   ; held: it fills with light
     }
-    if EdgeHeld(contact) {                          ; held long enough: off to that desktop, window in hand
-        Send(contact < 0 ? "^#{Left}" : cur + 1 < count ? "^#{Right}" : "^#d")
-        bumpSquash[contact < 0 ? 1 : 2] := 1        ; the little bounce
-        edgeSince := A_TickCount                    ; still held there: the next one 0.75 s later
-        SetTimer(BarRefresh, -450)                  ; once the slide is done, the dock shows where you are
-    }
-}
-
-BumpDraw(i, side, k, fill, alpha, x, y, plus := 0, depth := 0) {
-    global bumpVis
-    static pinned := false
-    g := BumpGeom(), bw := g.bw, bh := g.bh, pa := bh, pb := GlowPeriod2(bh)   ; the whole palette along a bump
-    sa := BumpStrip(pa, 0), sb := BumpStrip(pb, GLOW_COLORS.Length // 2)
-    ya := Mod(A_TickCount * pa // (2 * GLOW_FLOW_MS), pa)            ; one layer flows up...
-    yb := pb - Mod(A_TickCount * pb // (2 * GLOW_FLOW2_MS), pb)      ; ...the other down
-    canvas := GlowCanvas(bw, bh), mk := side < 0 ? BumpMasks(k).l : BumpMasks(k).r
-    DllCall("BitBlt", "Ptr", canvas, "Int", 0, "Int", 0, "Int", bw, "Int", bh, "Ptr", sa.dc, "Int", 0, "Int", ya, "UInt", 0x00CC0020)
-    DllCall("msimg32\AlphaBlend", "Ptr", canvas, "Int", 0, "Int", 0, "Int", bw, "Int", bh
-        , "Ptr", sb.dc, "Int", 0, "Int", yb, "Int", bw, "Int", bh, "UInt", 150 << 16)
-    if (fill > 0)                                   ; held: it fills with light
-        DllCall("msimg32\AlphaBlend", "Ptr", canvas, "Int", 0, "Int", 0, "Int", bw, "Int", bh
-            , "Ptr", BumpWhite(), "Int", 0, "Int", 0, "Int", bw, "Int", bh, "UInt", Round(220 * fill) << 16)
-    DllCall("msimg32\AlphaBlend", "Ptr", canvas, "Int", 0, "Int", 0, "Int", bw, "Int", bh
-        , "Ptr", mk.inv, "Int", 0, "Int", 0, "Int", bw, "Int", bh, "UInt", (1 << 24) | (255 << 16))
-    DllCall("BitBlt", "Ptr", canvas, "Int", 0, "Int", 0, "Int", bw, "Int", bh, "Ptr", mk.keep, "Int", 0, "Int", 0, "UInt", 0x008800C6)
-    if (plus > 0) {                                 ; a black "+" in the bump's belly: going on makes a new desktop
-        p := BumpPlus(), cx := side > 0 ? bw - depth * 0.55 : depth * 0.55
-        DllCall("msimg32\AlphaBlend", "Ptr", canvas, "Int", Round(cx - p.size / 2), "Int", (bh - p.size) // 2, "Int", p.size, "Int", p.size
-            , "Ptr", p.dc, "Int", 0, "Int", 0, "Int", p.size, "Int", p.size, "UInt", (1 << 24) | (Round(255 * plus) << 16))
-    }
-    GlowPut(bumpWin[i], x, y, bw, bh, canvas, Min(255, alpha))
-    static raised := [0, 0]
-    if (!bumpVis[i] || A_TickCount - raised[i] > 100)   ; back on top now and then: Snap's preview comes up over everything
-        OnTop(bumpWin[i]), bumpVis[i] := true, raised[i] := A_TickCount
-    if !pinned
-        pinned := VdaCall(pPin, "Ptr", bumpWin[1].Hwnd, "Int") != -1 && VdaCall(pPin, "Ptr", bumpWin[2].Hwnd, "Int") != -1
+    return contact
 }
 
 ; ---- The window in your hand: Windows' own border lights up (Windows 11) ----
@@ -1400,9 +1005,6 @@ WinGlowFrame() {
     borderAt := now                                 ; still: one colour at a time, round the palette
     WinBorder(winGlowHwnd, GlowColorAt(Mod(now, 4000), 4000, 0))
 }
-
-; Shows a glow window on top of everything, without activating it.
-OnTop(g) => DllCall("SetWindowPos", "Ptr", g.Hwnd, "Ptr", -1, "Int", 0, "Int", 0, "Int", 0, "Int", 0, "UInt", 0x53)   ; TOPMOST; NOSIZE|NOMOVE|NOACTIVATE|SHOWWINDOW
 
 SetTimer(WarmBar, -5000)
 
@@ -1594,8 +1196,8 @@ global MSG_DESKTOP_CHANGED := 0x1400 + 30
 
 UpdateTray(*) {
     global shownIndex, shownCount, connected, failures, warned
-    i := CurrentDesktop(), c := DesktopCount()
-    if vdaBroken {                                  ; incompatible DLL: stop polling, the menu keeps working
+    i := desk.Current(), c := desk.Count()
+    if desk.Broken {                                ; incompatible DLL: stop polling, the menu keeps working
         SetTimer(UpdateTray, 0)
         return
     }
@@ -1611,7 +1213,7 @@ UpdateTray(*) {
     }
     if !connected {                                 ; first success: listen for switches, poll as a safety net
         connected := true, failures := 0
-        VdaCall(pHook, "Ptr", A_ScriptHwnd, "Int", MSG_DESKTOP_CHANGED, "Int")
+        desk.Listen(A_ScriptHwnd, MSG_DESKTOP_CHANGED)
         OnMessage(MSG_DESKTOP_CHANGED, UpdateTray)
         SetTimer(UpdateTray, 1000)
     }
@@ -1626,7 +1228,7 @@ UpdateTray(*) {
     TraySetIcon(icon)
     if switched
         TrayFlash(icon)
-    name := DesktopName(i)
+    name := desk.Name(i)
     A_IconTip := "Desktop " n " of " c (name != "" ? " — " name : "")
 }
 

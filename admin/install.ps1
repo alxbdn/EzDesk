@@ -88,8 +88,9 @@ try {
     }
 
     # --- Files -----------------------------------------------------------------------------------
-    New-Item -ItemType Directory -Force "$InstallDir\icons" | Out-Null
+    New-Item -ItemType Directory -Force "$InstallDir\icons", "$InstallDir\lib" | Out-Null
     Copy-Item "$src\EzDesk.ahk" $InstallDir -Force
+    Copy-Item "$src\lib\*.ahk" "$InstallDir\lib" -Force
     if ($exe -ne "$InstallDir\EzDesk.exe") { Copy-Item $exe "$InstallDir\EzDesk.exe" -Force }
     Remove-Item "$InstallDir\AutoHotkey64.exe", "$InstallDir\install-startup.ps1" -ErrorAction SilentlyContinue   # older layouts
 
