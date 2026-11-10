@@ -1,5 +1,5 @@
 # Admin mode: installs EzDesk into Program Files and starts it at logon with admin rights,
-# so its shortcuts also work over admin windows (Task Manager, installers, admin terminals).
+# so it also works with admin windows (Task Manager, installers, admin terminals).
 # Usage:  powershell -ExecutionPolicy Bypass -File .\install.ps1     (or double-click "Install admin mode.cmd")
 # Works from the release zip (uses the bundled files) or from a clone of the repo (downloads what's missing).
 # Safe to run again: it updates an existing install in place, and replaces a pre-rename
@@ -7,7 +7,7 @@
 param(
     [string]$InstallDir = "$env:ProgramFiles\EzDesk",
     [string]$User       = "$env:USERDOMAIN\$env:USERNAME",   # captured before elevation, so the task is yours
-    [double]$Outline    = 1,
+    [double]$Outline    = 0,
     [string]$Log        = ""
 )
 $ErrorActionPreference = 'Stop'

@@ -1,7 +1,8 @@
-# Generates the tray icons: a black rounded square with a white number, 1-9 plus 'more' for 10+.
-# Usage: .\make-icons.ps1 -OutDir <folder> [-Outline 0|1|2]   (border width in px at 16px; 0 = none)
+# Generates the tray icons: a black rounded square with a blue number, 1-9 plus 'more' for 10+.
+# Usage: .\make-icons.ps1 -OutDir <folder> [-Outline 0|1|2] [-Ink '#RRGGBB']
+#   Outline: border width in px at 16px (0 = none); Ink: the number's (and border's) colour
 # (The app's own icon is brand\ezdesk.ico; these are only the numbered tray badges.)
-param([Parameter(Mandatory)] [string]$OutDir, [double]$Outline = 1,
+param([Parameter(Mandatory)] [string]$OutDir, [double]$Outline = 0, [string]$Ink = '#4FA6EC',
       [int[]]$Sizes = @(16, 20, 24, 32, 40, 48, 64),
       [string[]]$Labels = @('1','2','3','4','5','6','7','8','9','+'))
 Add-Type -AssemblyName System.Drawing
@@ -9,6 +10,7 @@ Add-Type -AssemblyName System.Drawing
 $sizes = $Sizes
 $labels = $Labels
 $bg = [System.Drawing.Color]::Black
+$ink = [System.Drawing.ColorTranslator]::FromHtml($Ink)    # the glow's blue: no white anywhere
 
 function RoundRect([double]$x, [double]$y, [double]$w, [double]$h, [double]$r) {
     $p = New-Object System.Drawing.Drawing2D.GraphicsPath
@@ -34,11 +36,11 @@ function New-Png([string]$text, [int]$s) {
     $side = $s - 2*$m
     $g.FillPath((New-Object System.Drawing.SolidBrush $bg), (RoundRect $m $m $side $side $r))
 
-    # optional white border, drawn inside the square so the icon doesn't grow
+    # optional border, drawn inside the square so the icon doesn't grow
     if ($Outline -gt 0) {
         $pw = [math]::Max(1.0, [math]::Round($Outline * $s / 16))   # whole pixels only
         $h = $pw / 2
-        $pen = New-Object System.Drawing.Pen ([System.Drawing.Color]::White), $pw
+        $pen = New-Object System.Drawing.Pen $ink, $pw
         $g.DrawPath($pen, (RoundRect ($m + $h) ($m + $h) ($side - $pw) ($side - $pw) ([math]::Max(1, $r - $h))))
     }
 
@@ -51,7 +53,7 @@ function New-Png([string]$text, [int]$s) {
     $mx = New-Object System.Drawing.Drawing2D.Matrix
     $mx.Translate(($s - $b.Width) / 2 - $b.X, ($s - $b.Height) / 2 - $b.Y)
     $tp.Transform($mx)
-    $g.FillPath([System.Drawing.Brushes]::White, $tp)
+    $g.FillPath((New-Object System.Drawing.SolidBrush $ink), $tp)
 
     $g.Dispose()
     # Classic DIB icon frame: BITMAPINFOHEADER + bottom-up BGRA pixels + 1bpp AND mask
