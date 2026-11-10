@@ -9,9 +9,18 @@
 #Include %A_ScriptDir%\..\lib\Glow.ahk
 #Include %A_ScriptDir%\..\lib\Desktops.ahk
 #Include %A_ScriptDir%\..\lib\Hold.ahk
+#Include %A_ScriptDir%\..\lib\HeldWindow.ahk
 #Include %A_ScriptDir%\FakeDesktops.ahk
+#Include %A_ScriptDir%\FakeWinOps.ahk
 
 global passed := 0, failures := []
+
+; A runtime error goes to the console and stops the run, never to a dialog on the screen.
+OnError(Crashed)
+Crashed(err, *) {
+    FileAppend("ERROR " err.Message (err.Extra != "" ? " (" err.Extra ")" : "") " at " err.File ":" err.Line "`n", "*")
+    ExitApp(2)
+}
 
 Eq(name, got, want) {
     global passed
@@ -245,9 +254,101 @@ TestGlow() {
     Eq("bell: fades near its end", BellEdge(0.9, 20, 100).fade < 1, true)
 }
 
+; ---------------------------------------------------------------------
+;  The window in hand: whatever was changed comes back
+; ---------------------------------------------------------------------
+; A frame as BarTrack makes it: Fw(w, now, overDock, dragging, full).
+Fw(w, now, over := false, dragging := false, full := true) => w.Frame(100, 900, now, over, dragging, full)
+
+TestHeldWindow() {
+    ; Held, then let go: on top and lit while still, all back after.
+    o := FakeWinOps(), w := HeldWindow(o)
+    w.Grab(5, 0)
+    Eq("grab: on top", o.IsTopmost(5), true)
+    Fw(w, 200), Fw(w, 400)
+    Eq("border: lit while still", o.borders.Has(5) && o.borders[5] != -1, true)
+    w.Release()
+    Eq("release: clean", o.Clean(5), true)
+    n := o.calls.Length, w.Release()
+    Eq("release twice: nothing more", o.calls.Length, n)
+
+    ; Moving: the border is left alone (changing it made dragging lag). Light frames neither.
+    o := FakeWinOps(), w := HeldWindow(o), w.Grab(5, 0)
+    Loop 10
+        o.places[5] := A_Index "|0|800|600", Fw(w, A_Index * 100)
+    Eq("border: not while moving", o.borders.Has(5), false)
+    Fw(w, 2000, false, false, false), Fw(w, 3000, false, false, false)
+    Eq("border: not on light frames", o.borders.Has(5), false)
+
+    ; Always on top already: it stays so. Windows 10: no border at all.
+    o := FakeWinOps(), o.tops[5] := true, w := HeldWindow(o)
+    w.Grab(5, 0), w.Release()
+    Eq("was on top: stays", o.IsTopmost(5), true)
+    o := FakeWinOps(false), w := HeldWindow(o)
+    w.Grab(5, 0), Fw(w, 200), Fw(w, 400), w.Release()
+    Eq("Windows 10: no border", InStr(o.Says(), "border"), 0)
+
+    ; Another window grabbed: the first one is let go first. The same one again: just back in front.
+    o := FakeWinOps(), w := HeldWindow(o)
+    w.Grab(5, 0), w.Grab(6, 10)
+    Eq("other grab: first released", o.IsTopmost(5) " " o.IsTopmost(6), "0 1")
+    raised := 0, o := FakeWinOps(), w := HeldWindow(o, () => raised += 1)
+    w.Grab(5, 0), w.Grab(5, 50)
+    Eq("same grab: in front twice", o.Says(), "top 5, top 5")
+    Eq("same grab: bumps raised twice", raised, 2)
+
+    ; Dragged over the dock: pictured, the real one invisible; small after a while; back on leaving.
+    o := FakeWinOps(), w := HeldWindow(o), w.Grab(5, 0)
+    Fw(w, 100, true, true, false)
+    Eq("shrink: starts", o.Says(), "top 5, picture 5, alpha 5 0, show")
+    Loop 20
+        Fw(w, 100 + A_Index, true, true, false)
+    Eq("shrink: small", o.lastW, 260)
+    Loop 20
+        Fw(w, 200 + A_Index, false, true, false)
+    Eq("shrink: grown back", o.shown " " o.live " " o.alphas[5], "0 0 Off")
+    w.Release()
+    Eq("shrink, released: clean", o.Clean(5), true)
+
+    ; Let go over the dock, mid-shrink: all back.
+    o := FakeWinOps(), w := HeldWindow(o), w.Grab(5, 0)
+    Fw(w, 100, true, true), Fw(w, 120, true, true)
+    w.Release()
+    Eq("released mid-shrink: clean", o.Clean(5), true)
+    ; The drag ended (Windows says so before the dock closes): back at once.
+    o := FakeWinOps(), w := HeldWindow(o), w.Grab(5, 0)
+    Fw(w, 100, true, true), Fw(w, 120, true, false)
+    Eq("drag over: picture gone", o.shown " " o.live, "0 0")
+
+    ; Held still over the dock (or browsing): no picture, the window itself at 45 %; back when it leaves.
+    o := FakeWinOps(), w := HeldWindow(o), w.Grab(5, 0)
+    Fw(w, 100, true, false)
+    Eq("held still: no picture", InStr(o.Says(), "picture"), 0)
+    Eq("held still: 45 %", o.alphas[5], 115)
+    Fw(w, 120, true, true)
+    Eq("held still, then dragged: still 45 %", o.alphas[5] " " InStr(o.Says(), "picture"), "115 0")
+    Fw(w, 140, false, true)
+    Eq("held still: back on leaving", o.alphas[5], "Off")
+    w.Release()
+    Eq("held still: clean", o.Clean(5), true)
+
+    ; Can't be pictured: half see-through instead, then back.
+    o := FakeWinOps(true, "fallback"), w := HeldWindow(o), w.Grab(5, 0)
+    Fw(w, 100, true, true)
+    Eq("fallback: faded", o.alphas[5], 115)
+    Fw(w, 120, false, true)
+    Eq("fallback: back", o.alphas[5], "Off")
+    ; Left alone (draws its own transparency): asked once, never touched.
+    o := FakeWinOps(true, "skip"), w := HeldWindow(o), w.Grab(5, 0)
+    Fw(w, 100, true, true), Fw(w, 120, true, true), w.Release()
+    Eq("skip: asked once", StrSplit(o.Says(), "picture").Length - 1, 1)
+    Eq("skip: never faded", o.alphas.Has(5), false)
+}
+
 TestHold()
 TestDesktops()
 TestGlow()
+TestHeldWindow()
 
 for msg in failures
     FileAppend("FAIL " msg "`n", "*")

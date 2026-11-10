@@ -39,8 +39,8 @@ Everything is done with the mouse.
 
 | Action | Effect |
 |---|---|
-| Grab a window by its title bar (moving it or not) | A dock of your desktops rises at the bottom of the screen, a dark rounded panel ringed with a flowing blue glow, each desktop a live miniature, like the Spaces bar on a Mac (your windows don't move around as in Task View). The window you hold glows too. The dock stays in front of everything |
-| Bring it over the dock | The dock turns see-through, so you see what you're carrying under it, and the window shrinks to a small picture of itself, like on a Mac; both come back when it leaves |
+| Grab a window by its title bar (moving it or not) | A dock of your desktops rises at the bottom of the screen, a dark rounded panel ringed with a flowing blue glow, each desktop a live miniature, like the Spaces bar on a Mac (your windows don't move around as in Task View). The window you hold glows too, and stays in front |
+| Bring it over the dock | It shrinks to a small, see-through picture of itself, like on a Mac, so you see the dock under it, and grows back when it leaves |
 | Drop it on a desktop in the dock | It goes there, and you stay where you are. On Windows 11, **+** makes a new desktop |
 | Keep it over a desktop in the dock for a second | You slide to that desktop, the window still in your hand |
 | Bring it into the glowing bump on the left or right of the screen | Hold it there: you slide to the previous / next desktop with the window in hand (a new one after the last), one every 0.75 s |
@@ -88,7 +88,7 @@ powershell -ExecutionPolicy Bypass -File .\build-release.ps1 -Version 1.0.0
 
 It downloads pinned versions of AutoHotkey and VirtualDesktopAccessor, checks their SHA256, generates the icons with `make-icons.ps1` and writes `dist\EzDesk.zip`. Pushing a `v*` tag runs the same build on GitHub Actions and publishes the release.
 
-The code is `EzDesk.ahk` plus three modules in `lib\`: `Desktops.ahk` (Windows' virtual desktops), `Hold.ahk` (the hold gesture, from the press to the drop) and `Glow.ahk` (the light round the dock and the bumps). Their tests run without touching your desktops or your screen:
+The code is `EzDesk.ahk` plus four modules in `lib\`: `Desktops.ahk` (Windows' virtual desktops), `Hold.ahk` (the hold gesture, from the press to the drop), `HeldWindow.ahk` (how the window in hand looks while it's held, and putting it back) and `Glow.ahk` (the light round the dock and the bumps). Their tests run without touching your desktops or your screen:
 
 ```powershell
 dist\EzDesk\EzDesk.exe /ErrorStdOut tests\run-tests.ahk

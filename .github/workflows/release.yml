@@ -28,7 +28,7 @@ jobs:
         run: |
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $z = [IO.Compression.ZipFile]::OpenRead("dist\EzDesk.zip"); $names = $z.Entries.FullName; $z.Dispose()
-          $required = 'EzDesk.exe', 'EzDesk.ahk', 'lib/Desktops.ahk', 'lib/Hold.ahk', 'lib/Glow.ahk', 'lib/Dib.ahk', 'VirtualDesktopAccessor.dll', 'VirtualDesktopAccessor-win10.dll', 'icons/1.ico', 'icons/more.ico',
+          $required = 'EzDesk.exe', 'EzDesk.ahk', 'lib/Desktops.ahk', 'lib/Hold.ahk', 'lib/HeldWindow.ahk', 'lib/Glow.ahk', 'lib/Dib.ahk', 'VirtualDesktopAccessor.dll', 'VirtualDesktopAccessor-win10.dll', 'icons/1.ico', 'icons/more.ico',
                       'README.txt', 'LICENSE.txt', 'LICENSE-AutoHotkey.txt', 'admin/install.ps1', 'admin/Install admin mode.cmd'
           foreach ($n in $required) { if ($names -notcontains "EzDesk/$n") { throw "zip is missing $n" } }
           if ($names -like '*\*') { throw 'zip entries must use / separators' }

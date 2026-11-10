@@ -17,9 +17,10 @@ Persistent
 ; virtual desktops aren't reachable yet (login, Explorer restart) the app
 ; still shows its own icon, its menu still works and Exit still exits.
 ;
-; Three modules live in lib\, each with its own tests in tests\:
+; Four modules live in lib\, each with its own tests in tests\:
 ;   Desktops.ahk   Windows' virtual desktops, behind one seam (the DLL and Windows' shortcuts)
 ;   Hold.ahk       the hold gesture: from a press on a title bar to the drop, as intents
+;   HeldWindow.ahk how the window in hand looks while it's held, and putting it all back
 ;   Glow.ahk       the flowing light round the dock and on the side bumps
 ; This file wires them to the mouse, the screen and the tray.
 
@@ -27,6 +28,7 @@ Persistent
 #Include %A_ScriptDir%\lib\Glow.ahk
 #Include %A_ScriptDir%\lib\Desktops.ahk
 #Include %A_ScriptDir%\lib\Hold.ahk
+#Include %A_ScriptDir%\lib\HeldWindow.ahk
 
 ; Our icon right away, never AutoHotkey's green "H".
 TraySetIcon(A_ScriptDir "\icons\1.ico")
@@ -82,6 +84,8 @@ global holdOn := IniRead(SETTINGS, "EzDesk", "HoldWindow", 1) = 1       ; the do
 global perfMode := IniRead(SETTINGS, "EzDesk", "Performance", 0) = 1    ; lighter animation, always
 global trayReminder := IniRead(SETTINGS, "EzDesk", "TrayReminder", 1) = 1   ; say so when the tray icon is hidden
 global hold := HoldGesture()
+global inHand := HeldWindow(WinOps(WIN_BUILD >= 22000), RaiseBumps)   ; how it looks while held (lib\HeldWindow.ahk)
+OnExit((*) => inHand.Release())                    ; never leave a window see-through or on top behind us
 
 ; Where a window is, to put it back there when it's dropped on the dock.
 WindowPlace(hwnd) {
@@ -138,7 +142,7 @@ Perform(intents) {
     for it in intents {
         switch it.do {
             case "grab":
-                barHeld := it.hwnd, WinGlowShow(it.hwnd)
+                barHeld := it.hwnd, inHand.Grab(it.hwnd, A_TickCount)
             case "open":
                 BarShow(MonitorAt(it.x, it.y), it.hwnd)
             case "carry":
@@ -147,7 +151,7 @@ Perform(intents) {
             case "close":
                 BarHide()
             case "letGo":
-                WinGlowHide()
+                inHand.Release()
             case "slide":
                 desk.GoTo(it.to)
                 SetTimer(BarRefresh, -450)          ; once the slide is done, the dock shows where you are
@@ -362,7 +366,7 @@ BarLayout(mon, n) {
 ; shown before the old one goes, so it never blinks.
 BarShow(mon, held, intro := true) {
     global bar, barShown, barTiles, barThumbs, barHover, barBox, deckGeom, deckShownAt, barHeld
-    global barBase, deckRise, deckFade
+    global barBase, deckRise
     ; Uninterruptible: building the dock takes a moment (glass, wallpapers, miniatures), and a timer or
     ; a drag ending must not run in the middle of it (two docks stacked, or one torn down mid-build).
     Critical
@@ -419,169 +423,17 @@ BarShow(mon, held, intro := true) {
         DllCall("dwmapi\DwmUnregisterThumbnail", "Ptr", thumb)
     if oldBar
         try oldBar.Destroy()
-    if intro {
-        BumpsOpen()
-        WinGlowShow(held)
-    }
     if intro
-        deckFade := 1.0
-    else if (deckFade < 1)
-        DeckOpacity()                               ; a rebuild while a window is over it: see-through at once
+        BumpsOpen()
     DeckGlowFrame()
-    DockOnTop()                                     ; in front of the window in hand, the glows over it
-}
-
-; ---- Over the dock, the window in hand shrinks to a small picture of itself, like on a Mac ----
-; Windows itself places a dragged window, so it can't be resized mid-drag. Instead, near the dock,
-; it's pictured (PrintWindow), made see-through, and its picture shrinks round the point you hold
-; it by, follows the cursor, and grows back into the real window when it leaves the dock. Windows
-; that are layered already (they draw their own transparency) are left as they are.
-global shrinkGui := Gui("-Caption +AlwaysOnTop +ToolWindow +E0x080800A0"), shrink := 0
-global SHRINK_W := 260                              ; its width over the dock, in pixels at 100 %
-
-ShrinkFrame(x, y) {
-    global shrink
-    hwnd := hold.Dragging
-    if !hwnd {
-        ShrinkEnd()
-        return
-    }
-    s := A_ScreenDPI / 96, over := DockNear(x, y)
-    if (over && !shrink)
-        ShrinkStart(hwnd, x, y)
-    if !shrink
-        return
-    if shrink.fallback {                            ; couldn't picture it: just see-through over the dock
-        if !over
-            ShrinkEnd()
-        return
-    }
-    shrink.p += ((over ? 1 : 0) - shrink.p) * 0.35  ; eases in and out
-    if (!over && shrink.p < 0.03) {
-        ShrinkEnd()                                 ; back to the real window
-        return
-    }
-    e := shrink.p * shrink.p * (3 - 2 * shrink.p), small := Min(shrink.w, SHRINK_W * s)
-    ew := Max(1, Round(shrink.w + (small - shrink.w) * e)), eh := Max(1, Round(ew * shrink.h / shrink.w))
-    DllCall("SetStretchBltMode", "Ptr", shrink.canvas, "Int", 4)   ; HALFTONE: smooth
-    DllCall("StretchBlt", "Ptr", shrink.canvas, "Int", 0, "Int", 0, "Int", ew, "Int", eh
-        , "Ptr", shrink.full, "Int", shrink.ox, "Int", shrink.oy, "Int", shrink.w, "Int", shrink.h, "UInt", 0x00CC0020)
-    DllCall("BitBlt", "Ptr", shrink.canvas, "Int", 0, "Int", 0, "Int", ew, "Int", eh, "Ptr", shrink.opaque, "Int", 0, "Int", 0, "UInt", 0x00EE0086)   ; SRCPAINT: alpha 255
-    LayeredPut(shrinkGui, Round(x - ew * shrink.fx), Round(y - eh * shrink.fy), ew, eh, shrink.canvas
-        , Round(255 - 75 * e))                      ; a little see-through when small: the desktop under it shows
-    if !shrink.shown
-        OnTop(shrinkGui), shrink.shown := true, DockOnTop()   ; the dock stays in front of it
-}
-
-ShrinkStart(hwnd, x, y) {
-    global shrink
-    cls := ""
-    try {
-        cls := WinGetClass(hwnd)
-        if (WinGetExStyle(hwnd) & 0x80000)          ; layered already (draws its own transparency): leave it alone
-            return ShrinkLog("layered window, left alone: " cls)
-        WinGetPos(&wx, &wy, &ww, &wh, hwnd)
-    } catch as err
-        return ShrinkLog("can't read the window: " err.Message)
-    rect := Buffer(16, 0)                           ; the window as you see it, without the invisible borders
-    if DllCall("dwmapi\DwmGetWindowAttribute", "Ptr", hwnd, "UInt", 9, "Ptr", rect, "UInt", 16, "Int") != 0
-        return ShrinkFallback(hwnd, "no frame bounds: " cls)
-    fl := NumGet(rect, 0, "Int"), ft := NumGet(rect, 4, "Int"), fw := NumGet(rect, 8, "Int") - fl, fh := NumGet(rect, 12, "Int") - ft
-    if (fw < 8 || fh < 8)
-        return
-    full := NewDib(ww, wh)
-    if !DllCall("PrintWindow", "Ptr", hwnd, "Ptr", full, "UInt", 2) {   ; PW_RENDERFULLCONTENT
-        FreeDib(full)
-        return ShrinkFallback(hwnd, "PrintWindow failed: " cls)
-    }
-    opaque := NewDib(fw, fh, &ob)
-    Fill32(ob, fw * fh, 0xFF000000)
-    shrink := {hwnd: hwnd, full: full, canvas: NewDib(fw, fh), opaque: opaque, w: fw, h: fh, ox: fl - wx, oy: ft - wy
-        , fx: (x - fl) / fw, fy: (y - ft) / fh, p: 0, shown: false, fallback: false}
-    try WinSetTransparent(0, hwnd)                  ; the real one steps aside; its picture takes its place
-    catch as err
-        ShrinkLog("couldn't make it see-through: " cls " " err.Message)
-}
-
-; Can't picture it: the window itself goes half see-through over the dock instead.
-ShrinkFallback(hwnd, why) {
-    global shrink
-    ShrinkLog(why)
-    try WinSetTransparent(110, hwnd)
-    catch
-        return
-    shrink := {hwnd: hwnd, fallback: true}
-}
-
-; Why a window didn't shrink, in %TEMP%\EzDesk-debug.log (kept short).
-ShrinkLog(msg) {
-    static last := ""
-    if (msg = last)
-        return
-    last := msg, file := A_Temp "\EzDesk-debug.log"
-    try {
-        if (FileExist(file) && FileGetSize(file) > 20000)
-            FileDelete(file)
-        FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") "  " msg "`n", file)
-    }
-}
-
-ShrinkEnd() {
-    global shrink
-    if !shrink
-        return
-    try WinSetTransparent("Off", shrink.hwnd)
-    shrinkGui.Hide()
-    if !shrink.fallback
-        FreeDib(shrink.full), FreeDib(shrink.canvas), FreeDib(shrink.opaque)
-    shrink := 0
-}
-
-OnExit((*) => ShrinkEnd())                         ; never leave a window see-through behind us
-
-; ---- The dock stays in front of everything, and turns see-through under a window in hand ----
-; From the back: the window in hand (or its shrinking picture), the dock, its glow, the bumps.
-; With a window held over it, the dock fades to DECK_SEE, miniatures and glow included, so you see
-; what you're carrying under it; it comes back when the window leaves.
-global deckFade := 1.0, DECK_SEE := 0.45
-
-DockOnTop() {
-    if !barShown
-        return
-    DllCall("SetWindowPos", "Ptr", bar.Hwnd, "Ptr", -1, "Int", 0, "Int", 0, "Int", 0, "Int", 0, "UInt", 0x13)   ; TOPMOST, top of them; NOSIZE|NOMOVE|NOACTIVATE
-    deckGlow.Raise()
-    for b in bumpGlow
-        if b.visible
-            b.Raise()
+    deckGlow.Raise()                                ; the glow over the dock
+    inHand.Grab(held, A_TickCount)                  ; the window in hand over both (lit), the bumps over it
 }
 
 ; The cursor on the dock, or close to it (anywhere below its top, give or take 40 px).
 DockNear(x, y) {
     near := 40 * A_ScreenDPI / 96
     return barShown && x >= barBox.x - near && x < barBox.x + barBox.w + near && y >= barBox.y - near
-}
-
-; Every frame: eases the dock's opacity towards see-through (a window in hand over it) or solid.
-DeckSeeThrough(x, y) {
-    global deckFade
-    want := (hold.hwnd && DockNear(x, y)) ? DECK_SEE : 1
-    if (deckFade = want)
-        return
-    deckFade += (want - deckFade) * 0.3
-    if (Abs(want - deckFade) < 0.02)
-        deckFade := want
-    DeckOpacity()
-}
-
-; Puts deckFade on the dock window and its miniatures (DWM draws those itself, so they're told apart).
-; The glow round it takes it at its next frame.
-DeckOpacity() {
-    a := Round(255 * deckFade)
-    try WinSetTransparent(a, bar.Hwnd)
-    props := Buffer(48, 0)                          ; DWM_THUMBNAIL_PROPERTIES: opacity only
-    NumPut("UInt", 0x4, props, 0), NumPut("UChar", a, props, 36)
-    for thumb in barThumbs
-        DllCall("dwmapi\DwmUpdateThumbnailProperties", "Ptr", thumb, "Ptr", props, "Int")
 }
 
 ; After a desktop switch: the dock shows the new current desktop (and the new one, if one was made).
@@ -645,13 +497,10 @@ BarTrack(x, y) {
     autoLite := avg > 12 ? true : avg < 9 ? false : autoLite  ; on and off again as the PC chokes and recovers
     full := !(autoLite || perfMode) || odd          ; Performance mode (tray menu): always light
     DeckMotion()
-    if full {
+    if full
         DeckGlowFrame()
-        WinGlowFrame()
-    }
     edge := BumpFrame(x, y)
-    ShrinkFrame(x, y)
-    DeckSeeThrough(x, y)
+    inHand.Frame(x, y, A_TickCount, DockNear(x, y), hold.Dragging != 0, full)   ; its border, its picture over the dock
     DllCall("QueryPerformanceCounter", "Int64*", &t1 := 0)
     ms := (t1 - t0) * 1000 / freq
     if (full && ms < 40)                            ; full frames only (else skipping would hide the load); one-offs don't count
@@ -682,8 +531,7 @@ BarHide() {
     try bar.Destroy()
     deckGlow.Hide()
     BumpsHide()
-    WinGlowHide()
-    ShrinkEnd()
+    inHand.Release()
     SetTimer(BarRefresh, 0)
     bar := 0, barShown := false, barTiles := [], barThumbs := [], barHover := 0
 }
@@ -764,7 +612,7 @@ DeckGlowFrame() {
     g := deckGeom, mask := DeckMask(g.bw, g.bh, g.rad, g.mg)
     over := (deckOverlay && deckOverlay.fw = mask.w && deckOverlay.fh = mask.h) ? deckOverlay.dc : 0
     k := Min(1, (A_TickCount - deckShownAt) / 200)  ; fades in as it rises
-    deckGlow.Draw(mask, g.x, g.y, Round(240 * k * k * (3 - 2 * k) * deckFade), {over: over})   ; see-through with the dock
+    deckGlow.Draw(mask, g.x, g.y, Round(240 * k * k * (3 - 2 * k)), {over: over})
 }
 
 
@@ -907,6 +755,12 @@ BumpsOpen() {
     bumpOpenAt := A_TickCount, bumpShown := true
 }
 
+RaiseBumps() {                                      ; back over everything, the window in hand included
+    for b in bumpGlow
+        if b.visible
+            b.Raise()
+}
+
 BumpsHide() {
     global bumpShown
     for b in bumpGlow
@@ -952,58 +806,6 @@ BumpFrame(x, y) {
             , {white: hold.EdgeFill(side, now), stamp: stamp})   ; held: it fills with light
     }
     return contact
-}
-
-; ---- The window in your hand: Windows' own border lights up (Windows 11) ----
-; No layered windows following it (that made dragging lag): its own border (DWMWA_BORDER_COLOR, the
-; one the accent colour uses) takes the glow's blue, drawn by Windows, glued to the window. It's
-; changed only while the window is still, a few times a second, since each change makes Windows
-; redraw the window's frame; the window gets its usual border back on release. Windows 10: nothing.
-global winGlowOn := false, winGlowHwnd := 0, winGlowGeo := 0, winGlowStillAt := 0
-global WIN_BORDER := WIN_BUILD >= 22000, winBorderColor := -1
-
-WinGlowShow(hwnd) {
-    global winGlowOn, winGlowHwnd, winGlowGeo, winGlowStillAt
-    if (!hwnd || winGlowOn || !WIN_BORDER)
-        return
-    winGlowHwnd := hwnd, winGlowOn := true, winGlowGeo := 0, winGlowStillAt := A_TickCount
-    WinGlowFrame()
-}
-
-WinGlowHide() {
-    global winGlowOn
-    if !winGlowOn
-        return
-    WinBorder(winGlowHwnd, -1)                      ; its usual border again
-    winGlowOn := false
-}
-
-; Sets a window's border colour (0xRRGGBB), or -1 for Windows' default. Windows 11 only.
-WinBorder(hwnd, rgb) {
-    global winBorderColor
-    if (rgb = winBorderColor && rgb != -1)
-        return
-    winBorderColor := rgb
-    ref := rgb = -1 ? 0xFFFFFFFF : ((rgb & 0xFF) << 16) | (rgb & 0xFF00) | ((rgb >> 16) & 0xFF)   ; DWMWA_COLOR_DEFAULT, or COLORREF (BGR)
-    try DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", hwnd, "UInt", 34, "UInt*", ref, "UInt", 4, "Int")   ; DWMWA_BORDER_COLOR
-}
-OnExit((*) => WinGlowHide())
-
-WinGlowFrame() {
-    global winGlowGeo, winGlowStillAt
-    static borderAt := 0
-    if !winGlowOn
-        return
-    try WinGetPos(&x, &y, &w, &h, winGlowHwnd)
-    catch
-        return
-    pos := x "|" y "|" w "|" h, now := A_TickCount
-    if (pos != winGlowGeo)                          ; moving: leave it alone
-        winGlowGeo := pos, winGlowStillAt := now
-    if (now - winGlowStillAt < 120 || now - borderAt < 150)
-        return
-    borderAt := now                                 ; still: one colour at a time, round the palette
-    WinBorder(winGlowHwnd, GlowColorAt(Mod(now, 4000), 4000, 0))
 }
 
 SetTimer(WarmBar, -5000)
