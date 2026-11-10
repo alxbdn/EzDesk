@@ -39,8 +39,10 @@ Everything is done with the mouse.
 
 | Action | Effect |
 |---|---|
-| Hold a window by its title bar, without moving, for a moment | A dock of your desktops rises at the bottom of the screen, in frosted glass ringed with a flowing glow, each desktop a live miniature, like the Spaces bar on a Mac (your windows don't move around as in Task View). The window you hold glows too |
+| Grab a window by its title bar (moving it or not) | A dock of your desktops rises at the bottom of the screen, in Windows' frosted glass ringed with a flowing blue glow, each desktop a live miniature, like the Spaces bar on a Mac (your windows don't move around as in Task View). The window you hold glows too, and stays in front |
+| Bring it over the dock | It shrinks to a small picture of itself, like on a Mac, and grows back when it leaves |
 | Drop it on a desktop in the dock | It goes there, and you stay where you are. On Windows 11, **+** makes a new desktop |
+| Keep it over a desktop in the dock for a second | You slide to that desktop, the window still in your hand |
 | Bring it into the glowing bump on the left or right of the screen | Hold it there: you slide to the previous / next desktop with the window in hand (a new one after the last), one every 0.75 s |
 | Drop it anywhere else | An ordinary move; the dock goes away |
 | Scroll on the taskbar | Previous / next desktop |
