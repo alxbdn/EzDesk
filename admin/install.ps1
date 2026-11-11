@@ -1,7 +1,8 @@
 # Admin mode: installs EzDesk into Program Files and starts it at logon with admin rights,
 # so it also works with admin windows (Task Manager, installers, admin terminals).
 # Usage:  powershell -ExecutionPolicy Bypass -File .\install.ps1     (or double-click "Install admin mode.cmd")
-# Works from the release zip (uses the bundled files) or from a clone of the repo (downloads what's missing).
+# Works from the release zip (uses the bundled files) or from a clone of the repo after "cargo build --release"
+# (downloads the DLLs if they're missing).
 # Safe to run again: it updates an existing install in place, and replaces a pre-rename
 # "Desktop Switcher" install (its task, folder and startup shortcut).
 param(
@@ -40,29 +41,16 @@ if (-not $isAdmin) {
 function Say($msg) { Write-Host $msg; if ($Log) { Add-Content -Path $Log -Value $msg } }
 
 try {
-    # Release zip: this script sits in admin\ next to the app files. Repo clone: same folder.
-    $src = if (Test-Path "$PSScriptRoot\EzDesk.ahk") { $PSScriptRoot } else { Split-Path $PSScriptRoot }
-    if (-not (Test-Path "$src\EzDesk.ahk")) { throw "EzDesk.ahk not found next to $PSScriptRoot" }
+    # Release zip: this script sits in admin\ next to EzDesk.exe. Repo clone: the repo's root, where
+    # cargo builds it into target\release (run "cargo build --release" first).
+    $src = Split-Path $PSScriptRoot
+    $exe = @("$src\EzDesk.exe", "$src\target\release\EzDesk.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $exe) { throw "EzDesk.exe not found. From a clone of the repo, run 'cargo build --release' first." }
+    Say "App: $exe"
 
     # The elevated run may be a different admin account, so look up the *target* user's profile.
     $sid = (New-Object Security.Principal.NTAccount $User).Translate([Security.Principal.SecurityIdentifier]).Value
     $userProfile = (Get-CimInstance Win32_UserProfile | Where-Object SID -eq $sid).LocalPath
-
-    # --- Runtime: bundled EzDesk.exe (renamed AutoHotkey v2), else an AutoHotkey install ------------
-    $candidates = @(
-        "$src\EzDesk.exe",
-        "$userProfile\AppData\Local\Programs\AutoHotkey\v2\AutoHotkey64.exe",
-        "$env:ProgramFiles\AutoHotkey\v2\AutoHotkey64.exe",
-        "$InstallDir\EzDesk.exe"
-    )
-    $exe = $candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-    if (-not $exe) {
-        Say 'AutoHotkey v2 not found, installing it with winget...'
-        winget install --id AutoHotkey.AutoHotkey --exact --source winget
-        $exe = $candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-        if (-not $exe) { throw 'AutoHotkey v2 install failed. Install it from https://www.autohotkey.com and run this again.' }
-    }
-    Say "Runtime: $exe"
 
     # --- Stop every running copy (admin task or simple mode, either name) so files can be replaced --
     foreach ($t in $TaskName, $OldTaskName) {
@@ -78,6 +66,10 @@ try {
     foreach ($lnk in "$startup\EzDesk.lnk", "$startup\Desktop Switcher.lnk") {
         if (Test-Path $lnk) { Remove-Item $lnk -Force; Say "Removed the simple-mode startup shortcut ($(Split-Path $lnk -Leaf))" }
     }
+    $run = "Registry::HKEY_USERS\$sid\Software\Microsoft\Windows\CurrentVersion\Run"   # simple mode, since 1.4
+    if (Get-ItemProperty -Path $run -Name EzDesk -ErrorAction SilentlyContinue) {
+        Remove-ItemProperty -Path $run -Name EzDesk; Say 'Turned off the simple-mode "Start with Windows"'
+    }
 
     # Admin mode from before the rename: its task and folder are replaced by the EzDesk ones.
     if (Get-ScheduledTask -TaskName $OldTaskName -ErrorAction SilentlyContinue) {
@@ -88,11 +80,11 @@ try {
     }
 
     # --- Files -----------------------------------------------------------------------------------
-    New-Item -ItemType Directory -Force "$InstallDir\icons", "$InstallDir\lib" | Out-Null
-    Copy-Item "$src\EzDesk.ahk" $InstallDir -Force
-    Copy-Item "$src\lib\*.ahk" "$InstallDir\lib" -Force
-    if ($exe -ne "$InstallDir\EzDesk.exe") { Copy-Item $exe "$InstallDir\EzDesk.exe" -Force }
-    Remove-Item "$InstallDir\AutoHotkey64.exe", "$InstallDir\install-startup.ps1" -ErrorAction SilentlyContinue   # older layouts
+    New-Item -ItemType Directory -Force "$InstallDir\icons" | Out-Null
+    Copy-Item $exe "$InstallDir\EzDesk.exe" -Force
+    # Older layouts: the AutoHotkey version's script, modules and licence, and earlier leftovers
+    Remove-Item "$InstallDir\EzDesk.ahk", "$InstallDir\lib", "$InstallDir\LICENSE-AutoHotkey.txt", "$InstallDir\AutoHotkey64.exe",
+        "$InstallDir\install-startup.ps1" -Recurse -Force -ErrorAction SilentlyContinue
 
     foreach ($d in $Dlls) {
         $dll = Join-Path $InstallDir $d.Name; $bundled = Join-Path $src $d.Name
@@ -120,7 +112,7 @@ try {
     Say 'Permissions: admin-only write'
 
     # --- Startup task ----------------------------------------------------------------------------
-    $action    = New-ScheduledTaskAction -Execute "$InstallDir\EzDesk.exe" -Argument "`"$InstallDir\EzDesk.ahk`" --startup" -WorkingDirectory $InstallDir
+    $action    = New-ScheduledTaskAction -Execute "$InstallDir\EzDesk.exe" -Argument '--startup' -WorkingDirectory $InstallDir
     $trigger   = New-ScheduledTaskTrigger -AtLogOn -User $User
     $trigger.Delay = 'PT5S'                                          # let Explorer start first
     $principal = New-ScheduledTaskPrincipal -UserId $User -LogonType Interactive -RunLevel Highest

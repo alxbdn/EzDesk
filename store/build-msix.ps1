@@ -19,13 +19,12 @@ $msixVersion = '{0}.{1}.{2}.0' -f $parts[0], $parts[1], $parts[2]
 $id = Get-Content (Join-Path $PSScriptRoot 'identity.json') -Raw | ConvertFrom-Json
 $layout = Join-Path $root 'dist\msix-layout'
 if (Test-Path $layout) { Remove-Item $layout -Recurse -Force }
-New-Item -ItemType Directory -Force "$layout\icons", "$layout\lib" | Out-Null
+New-Item -ItemType Directory -Force "$layout\icons" | Out-Null
 
 # App files: everything the simple mode needs. No admin\ folder: a Store app never runs elevated.
-Copy-Item "$AppDir\EzDesk.exe", "$AppDir\EzDesk.ahk", "$AppDir\VirtualDesktopAccessor.dll", "$AppDir\VirtualDesktopAccessor-win10.dll" $layout
+Copy-Item "$AppDir\EzDesk.exe", "$AppDir\VirtualDesktopAccessor.dll", "$AppDir\VirtualDesktopAccessor-win10.dll" $layout
 Copy-Item "$AppDir\icons\*.ico" "$layout\icons"
-Copy-Item "$AppDir\lib\*.ahk" "$layout\lib"
-Copy-Item "$AppDir\LICENSE.txt", "$AppDir\LICENSE-AutoHotkey.txt", "$AppDir\THIRD-PARTY-NOTICES.txt" $layout
+Copy-Item "$AppDir\LICENSE.txt", "$AppDir\THIRD-PARTY-NOTICES.txt" $layout
 & (Join-Path $PSScriptRoot 'make-store-assets.ps1') -OutDir "$layout\Assets" | Out-Null
 
 $xml = (Get-Content (Join-Path $PSScriptRoot 'AppxManifest.template.xml') -Raw).

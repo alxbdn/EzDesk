@@ -7,3 +7,6 @@ dist/
 
 # ...except the app icon, which is a source file
 !brand/ezdesk.ico
+
+# Rust build output
+target/

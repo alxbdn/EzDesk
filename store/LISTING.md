@@ -35,7 +35,7 @@ Upload `EzDesk.msix` from the GitHub Actions artifact **EzDesk-store-msix**, bui
 
 Partner Center asks you to justify it. Paste:
 
-> EzDesk is a classic Win32 desktop app (the AutoHotkey v2 runtime running an open-source script). Full trust is required to watch window drags and mouse presses system-wide (holding a window opens a dock of desktops to drop it on), to show that dock and its glow over other windows, to react to the mouse wheel over the taskbar, to show its notification-area icon with the current desktop number, and to call the Windows virtual desktop APIs through the open-source VirtualDesktopAccessor library. It does not access the network, user files or personal data. Source: https://github.com/alxbdn/ezdesk
+> EzDesk is a classic Win32 desktop app, written in Rust and open source. Full trust is required to watch window drags and mouse presses system-wide (holding a window brings up glowing bumps on the screen's sides, to slide it to another desktop), to show those bumps over other windows, to react to the mouse wheel over the taskbar, to show its notification-area icon with the current desktop number, and to call the Windows virtual desktop APIs through the open-source VirtualDesktopAccessor library. It does not access the network, user files or personal data. Source: https://github.com/alxbdn/ezdesk
 
 ## Store listing (English)
 
@@ -49,10 +49,9 @@ Partner Center asks you to justify it. Paste:
 
 > Windows has virtual desktops, but moving a window to another one takes a trip through Task View, and nothing tells you which desktop you're on. EzDesk makes it a mouse gesture.
 >
-> • Hold a window by its title bar for a moment: a dock of your desktops rises, each a live miniature. Drop the window on one: it goes there, and you stay where you are. "+" makes a new desktop.
-> • Or bring it into the glowing bump on either side of the screen: you slide to the next or previous desktop with the window in hand.
+> • Hold a window by its title bar for a moment: a glowing bump rises on each side of the screen. Bring the window into one and hold it there: you slide to the next or previous desktop with the window in hand. Past the last desktop, it makes a new one.
 > • Scroll on the taskbar: previous / next desktop. Scrolling over the volume icon still changes the volume.
-> • A tray icon shows the current desktop's number. Click it to open the dock: go to a desktop, close one, or make a new one.
+> • A tray icon shows the current desktop's number, and flashes when it changes. Click it for Task View.
 >
 > Organize your work the way you think: one desktop for meetings, one for email and the web, one for code. No shortcuts to learn.
 >
@@ -62,9 +61,8 @@ Partner Center asks you to justify it. Paste:
 
 **Features** (one per line in Partner Center)
 
-> Hold a window to get a dock of your desktops, and drop it on one
-> Live miniatures of every desktop, in a glowing dock
-> Glowing side bumps to slide a window to the next or previous desktop
+> Hold a window and bring it to a side of the screen to take it to the next or previous desktop
+> Glowing side bumps that swell as the window comes close
 > Scroll on the taskbar to step through desktops
 > Tray icon with the current desktop number
 > Starts with Windows (can be turned off in Settings › Apps › Startup)
@@ -76,6 +74,6 @@ Partner Center asks you to justify it. Paste:
 
 **What's new in this version**
 
-> All mouse now: hold a window by its title bar for a moment, a dock of your desktops rises; drop it on the one you want. Or bring it into the glowing bump on either side of the screen to take it to the next or previous desktop. The keyboard shortcuts are gone. The tray menu can now show apps from all desktops on the taskbar.
+> Rewritten in Rust: lighter and quicker to start. Simpler too: hold a window and bring it into the glowing bump on either side of the screen to take it to the next or previous desktop; the dock of desktops is gone. Clicking the tray number opens Task View.
 
 **Logo for the listing:** `brand/ezdesk-1080.png` (1:1 box art). Larger sizes come from `brand/ezdesk.svg`.

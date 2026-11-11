@@ -25,13 +25,12 @@
   </Resources>
 
   <Applications>
-    <!-- EzDesk.exe is the AutoHotkey v2 runtime; it runs EzDesk.ahk next to it.
-         Id and TaskId keep their pre-rename values: changing them would make Windows treat the update
+    <!-- Id and TaskId keep their pre-rename values: changing them would make Windows treat the update
          as a different app (lost Start pins, "Start with Windows" reset). Users never see them. -->
     <Application Id="DesktopSwitcher" Executable="EzDesk.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="{DISPLAY_NAME}"
-        Description="Fast virtual-desktop switching for Windows, with a tray icon that shows which desktop you're on."
+        Description="Move windows between virtual desktops with the mouse, and see which desktop you're on."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png" />
@@ -45,7 +44,7 @@
   </Applications>
 
   <Capabilities>
-    <!-- Required for a classic desktop app: global hotkeys and the tray icon -->
+    <!-- Required for a classic desktop app: the system-wide mouse hook, window drags and the tray icon -->
     <rescap:Capability Name="runFullTrust" />
   </Capabilities>
 </Package>
