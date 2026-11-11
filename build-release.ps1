@@ -1,17 +1,16 @@
 # Builds the ready-to-run release zip: dist\EzDesk.zip
-# Downloads AutoHotkey and VirtualDesktopAccessor (pinned versions, SHA256-checked) unless local copies are given.
-# Usage:  powershell -ExecutionPolicy Bypass -File .\build-release.ps1 -Version 1.0.0 [-AhkExe <path> -AhkLicense <path>] [-Dll <path>]
+# Builds EzDesk.exe with cargo (or takes a prebuilt one), and downloads VirtualDesktopAccessor (pinned
+# versions, SHA256-checked) unless local copies are given.
+# Usage:  powershell -ExecutionPolicy Bypass -File .\build-release.ps1 -Version 1.4.0 [-Exe <path>] [-Dll <path>] [-Dll10 <path>]
 param(
     [Parameter(Mandatory)] [string]$Version,
-    [string]$AhkExe, [string]$AhkLicense, [string]$Dll, [string]$Dll10,
+    [string]$Exe, [string]$Dll, [string]$Dll10,
     [string]$OutDir
 )
 $ErrorActionPreference = 'Stop'
 if (-not $OutDir) { $OutDir = Join-Path $PSScriptRoot 'dist' }   # PS 5.1: $PSScriptRoot is empty inside param defaults
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$AhkZipUrl    = 'https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.31/AutoHotkey_2.0.31.zip'
-$AhkZipSha256 = 'CA1A595ACA4528755D8D4CD7FED23D497A37BD9A0B6892072612D68DEE1BD00A'
 $DllUrl       = 'https://github.com/Ciantic/VirtualDesktopAccessor/releases/download/2024-12-16-windows11/VirtualDesktopAccessor.dll'
 $DllSha256    = '8740C572A1C000E3B87FFEB1E4C397EAE9AF3BD4A2ABDC3BCFFACAB4493F8FF5'
 $Dll10Url     = 'https://github.com/Ciantic/VirtualDesktopAccessor/releases/download/2019-windows10/VirtualDesktopAccessor.dll'
@@ -25,45 +24,35 @@ function Get-Verified($url, $sha, $dest) {
 
 $root  = $PSScriptRoot
 $stage = Join-Path $OutDir 'EzDesk'
-$tmp   = Join-Path ([IO.Path]::GetTempPath()) ("dsw-build-" + [guid]::NewGuid().ToString('N'))
 if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force }
-New-Item -ItemType Directory -Force "$stage\icons", "$stage\admin", $tmp | Out-Null
+New-Item -ItemType Directory -Force "$stage\icons", "$stage\admin" | Out-Null
 
-try {
-    # --- AutoHotkey runtime, renamed so a double-click runs EzDesk.ahk ------------------
-    if (-not $AhkExe) {
-        Get-Verified $AhkZipUrl $AhkZipSha256 "$tmp\ahk.zip"
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        [IO.Compression.ZipFile]::ExtractToDirectory("$tmp\ahk.zip", "$tmp\ahk")
-        $AhkExe = "$tmp\ahk\AutoHotkey64.exe"
-        $AhkLicense = Get-ChildItem "$tmp\ahk" -Filter 'license*.txt' | Select-Object -First 1 -ExpandProperty FullName
-    }
-    Copy-Item $AhkExe "$stage\EzDesk.exe"
-    # Own icon and name, so Windows lists "EzDesk" (tray settings, Task Manager), not "AutoHotkey 64-bit".
-    & "$root\rebrand-exe.ps1" -Exe "$stage\EzDesk.exe" -Icon "$root\brand\ezdesk.ico" -Version $Version
-    if (-not $AhkLicense) { throw 'AutoHotkey license file not found' }
-    Copy-Item $AhkLicense "$stage\LICENSE-AutoHotkey.txt"
+# --- EzDesk.exe ----------------------------------------------------------------------------------
+if (-not $Exe) {
+    $env:EZDESK_VERSION = $Version                                   # shown in the exe's properties
+    Push-Location $root
+    try { cargo build --release; if ($LASTEXITCODE -ne 0) { throw "cargo build failed ($LASTEXITCODE)" } } finally { Pop-Location }
+    $Exe = Join-Path $root 'target\release\EzDesk.exe'
+}
+Copy-Item $Exe "$stage\EzDesk.exe"
 
-    # --- VirtualDesktopAccessor --------------------------------------------------------------------
-    if ($Dll) {
-        if ((Get-FileHash $Dll).Hash -ne $DllSha256) { throw "Local DLL $Dll does not match the pinned SHA256" }
-        Copy-Item $Dll "$stage\VirtualDesktopAccessor.dll"
-    } else { Get-Verified $DllUrl $DllSha256 "$stage\VirtualDesktopAccessor.dll" }
-    if ($Dll10) {
-        if ((Get-FileHash $Dll10).Hash -ne $Dll10Sha256) { throw "Local DLL $Dll10 does not match the pinned SHA256" }
-        Copy-Item $Dll10 "$stage\VirtualDesktopAccessor-win10.dll"
-    } else { Get-Verified $Dll10Url $Dll10Sha256 "$stage\VirtualDesktopAccessor-win10.dll" }   # Windows 10 build
+# --- VirtualDesktopAccessor ----------------------------------------------------------------------
+if ($Dll) {
+    if ((Get-FileHash $Dll).Hash -ne $DllSha256) { throw "Local DLL $Dll does not match the pinned SHA256" }
+    Copy-Item $Dll "$stage\VirtualDesktopAccessor.dll"
+} else { Get-Verified $DllUrl $DllSha256 "$stage\VirtualDesktopAccessor.dll" }
+if ($Dll10) {
+    if ((Get-FileHash $Dll10).Hash -ne $Dll10Sha256) { throw "Local DLL $Dll10 does not match the pinned SHA256" }
+    Copy-Item $Dll10 "$stage\VirtualDesktopAccessor-win10.dll"
+} else { Get-Verified $Dll10Url $Dll10Sha256 "$stage\VirtualDesktopAccessor-win10.dll" }   # Windows 10 build
 
-    # --- App files ---------------------------------------------------------------------------------
-    Copy-Item "$root\EzDesk.ahk" $stage
-    New-Item -ItemType Directory -Force "$stage\lib" | Out-Null
-    Copy-Item "$root\lib\*.ahk" "$stage\lib"
-    Copy-Item "$root\admin\*" "$stage\admin"
-    Copy-Item "$root\LICENSE" "$stage\LICENSE.txt"
-    Copy-Item "$root\THIRD-PARTY-NOTICES.md" "$stage\THIRD-PARTY-NOTICES.txt"
-    & "$root\make-icons.ps1" -OutDir "$stage\icons" -Outline 0 | Out-Null
+# --- App files -----------------------------------------------------------------------------------
+Copy-Item "$root\admin\*" "$stage\admin"
+Copy-Item "$root\LICENSE" "$stage\LICENSE.txt"
+Copy-Item "$root\THIRD-PARTY-NOTICES.md" "$stage\THIRD-PARTY-NOTICES.txt"
+& "$root\make-icons.ps1" -OutDir "$stage\icons" -Outline 0 | Out-Null
 
-    @"
+@"
 EzDesk $Version  (formerly Desktop Switcher)
 https://github.com/alxbdn/ezdesk
 
@@ -73,12 +62,11 @@ START
   2. Right-click the icon > "Start with Windows" so it starts by itself.
 
 HOW IT WORKS (mouse only)
-  Hold a window still   hold it by its title bar for a moment: a dock of your desktops
-                        opens at the bottom; drop the window on one to send it there
-  Side bumps            or bring it into the glowing bump on the left / right of the
-                        screen to slide to the previous / next desktop with it
+  Hold a window         hold it by its title bar for a moment: a glowing bump rises on the
+                        left and right of the screen; bring the window into one and hold it
+                        there to slide to the previous / next desktop with it
   Scroll on taskbar     previous / next desktop
-  Click the icon        the dock: go to a desktop, close one, make a new one
+  Click the icon        Task View
 
 STOP / REMOVE
   Right-click the icon > untick "Start with Windows" > Exit, then delete this folder.
@@ -88,20 +76,17 @@ ADMIN MODE (optional, for power users)
   Double-click admin\Install admin mode.cmd. Remove it with admin\Uninstall admin mode.cmd.
 "@ | Set-Content "$stage\README.txt" -Encoding UTF8
 
-    # --- Zip (the folder itself is the top-level entry, so extracting gives one tidy folder) ------
-    # Entries are written by hand with "/" separators: Windows PowerShell's ZipFile uses "\", which other tools mangle.
-    Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
-    $zip = Join-Path $OutDir 'EzDesk.zip'
-    $archive = [IO.Compression.ZipFile]::Open($zip, 'Create')
-    try {
-        foreach ($f in Get-ChildItem $stage -Recurse -File) {
-            $name = 'EzDesk/' + $f.FullName.Substring($stage.Length + 1).Replace('\', '/')
-            [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $f.FullName, $name, 'Optimal') | Out-Null
-        }
-    } finally { $archive.Dispose() }
-    $sha = (Get-FileHash $zip).Hash
-    Set-Content (Join-Path $OutDir 'EzDesk.zip.sha256') -Encoding ASCII -Value "$sha  EzDesk.zip"
-    Write-Host "Built $zip  ($([math]::Round((Get-Item $zip).Length / 1MB, 2)) MB)  SHA256 $sha"
-} finally {
-    Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
-}
+# --- Zip (the folder itself is the top-level entry, so extracting gives one tidy folder) ---------
+# Entries are written by hand with "/" separators: Windows PowerShell's ZipFile uses "\", which other tools mangle.
+Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+$zip = Join-Path $OutDir 'EzDesk.zip'
+$archive = [IO.Compression.ZipFile]::Open($zip, 'Create')
+try {
+    foreach ($f in Get-ChildItem $stage -Recurse -File) {
+        $name = 'EzDesk/' + $f.FullName.Substring($stage.Length + 1).Replace('\', '/')
+        [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $f.FullName, $name, 'Optimal') | Out-Null
+    }
+} finally { $archive.Dispose() }
+$sha = (Get-FileHash $zip).Hash
+Set-Content (Join-Path $OutDir 'EzDesk.zip.sha256') -Encoding ASCII -Value "$sha  EzDesk.zip"
+Write-Host "Built $zip  ($([math]::Round((Get-Item $zip).Length / 1MB, 2)) MB)  SHA256 $sha"

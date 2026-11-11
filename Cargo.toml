@@ -1,0 +1,39 @@
+[package]
+name = "ezdesk"
+version = "1.4.0"
+edition = "2021"
+description = "Move windows between virtual desktops with the mouse, and see which desktop you're on"
+license = "MIT"
+repository = "https://github.com/alxbdn/ezdesk"
+build = "build.rs"
+
+[[bin]]
+name = "EzDesk"
+path = "src/main.rs"
+
+[dependencies.windows]
+version = "0.58"
+features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_Storage_Packaging_Appx",
+    "Win32_System_Com",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_System_WindowsProgramming",
+    "Win32_UI_Accessibility",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
