@@ -78,6 +78,38 @@ pub fn is_real_window(h: HWND) -> bool {
     }
 }
 
+/// Every top-level window, top-most first.
+pub fn top_level_windows() -> Vec<HWND> {
+    use windows::Win32::UI::WindowsAndMessaging::FindWindowExW;
+    let mut out = vec![];
+    let mut h = HWND::default();
+    while let Ok(next) = unsafe { FindWindowExW(None, h, PCWSTR::null(), PCWSTR::null()) } {
+        if next.is_invalid() {
+            break;
+        }
+        out.push(next);
+        h = next;
+    }
+    out
+}
+
+/// Hidden by its own app (a Store app in the background), not just on another desktop.
+pub fn cloaked_by_app(h: HWND) -> bool {
+    use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
+    let mut c = 0u32;
+    unsafe { DwmGetWindowAttribute(h, DWMWA_CLOAKED, &mut c as *mut u32 as *mut _, 4) }.is_ok() && c & 1 != 0
+}
+
+/// The whole screen at (x, y), taskbar included.
+pub fn monitor_at(x: i32, y: i32) -> RECT {
+    unsafe {
+        let mon = MonitorFromPoint(POINT { x, y }, MONITOR_DEFAULTTONEAREST);
+        let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+        let _ = GetMonitorInfoW(mon, &mut mi);
+        mi.rcMonitor
+    }
+}
+
 /// What went wrong, in %TEMP%\EzDesk-debug.log (kept short).
 pub fn log(msg: &str) {
     use std::io::Write;

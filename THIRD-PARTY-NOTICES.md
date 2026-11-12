@@ -1,10 +1,10 @@
 # Third-party notices
 
-EzDesk is written in Rust. The release zip bundles one third-party component, and `EzDesk.exe` is built with one third-party library.
+EzDesk is written in Rust. `EzDesk.exe` is built with two third-party libraries, and the release zip bundles one third-party component for older Windows.
 
-## VirtualDesktopAccessor (`VirtualDesktopAccessor.dll`, `VirtualDesktopAccessor-win10.dll`)
+## VirtualDesktopAccessor (`winvd`, compiled into `EzDesk.exe`; `VirtualDesktopAccessor.dll`, `VirtualDesktopAccessor-win10.dll`)
 
-From [Ciantic/VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor): release `2024-12-16-windows11` for Windows 11, and release `2019-windows10`, renamed `VirtualDesktopAccessor-win10.dll`, for Windows 10. Same author and license.
+From [Ciantic/VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor). On Windows 11 24H2 and later, EzDesk uses its Rust library, [`winvd`](https://crates.io/crates/winvd) 0.0.49, compiled into the exe; a copy is in `vendor/winvd`, modified by EzDesk to add one public function, `move_desktop` (see `vendor/winvd/EZDESK.md`). On older Windows it loads the DLLs: release `2024-12-16-windows11` for Windows 11, and release `2019-windows10`, renamed `VirtualDesktopAccessor-win10.dll`, for Windows 10. Same author and license.
 
 ```
 MIT License

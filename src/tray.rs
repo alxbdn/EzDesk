@@ -11,7 +11,8 @@ use windows::Win32::Graphics::Gdi::{
     DIB_RGB_COLORS,
 };
 use windows::Win32::UI::Shell::{
-    Shell_NotifyIconW, NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_NOSOUND, NIM_ADD, NIM_DELETE, NIM_MODIFY, NOTIFYICONDATAW,
+    Shell_NotifyIconGetRect, Shell_NotifyIconW, NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_SHOWTIP, NIF_TIP, NIIF_NOSOUND, NIM_ADD, NIM_DELETE,
+    NIM_MODIFY, NIM_SETVERSION, NOTIFYICONDATAW, NOTIFYICONIDENTIFIER, NOTIFYICON_VERSION_4,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateIconIndirect, DestroyIcon, DrawIconEx, GetSystemMetrics, LoadIconW, LoadImageW, DI_NORMAL, HICON, ICONINFO, IDI_APPLICATION,
@@ -21,9 +22,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
 /// Windows tells the main window about clicks on the icon with this message.
 pub const WM_TRAY: u32 = WM_APP + 1;
 pub const ID: u32 = 1;
-/// lParam of WM_TRAY when a notification was clicked / closed or gone without a click.
+/// lParam's low word of WM_TRAY when a notification was clicked / closed or gone without a click.
 pub const BALLOON_CLICK: u32 = 0x405;
 pub const BALLOON_GONE: u32 = 0x404;
+/// The mouse rests on the icon (rich mode: instead of a tooltip, the app shows its own).
+pub const POPUP_OPEN: u32 = 0x406;
 
 pub struct Tray {
     hwnd: HWND,
@@ -31,6 +34,9 @@ pub struct Tray {
     own_icon: bool,
     tip: String,
     flashes: HashMap<String, Vec<HICON>>,
+    /// Rich mode: no tooltip; Windows says when the mouse rests on the icon (POPUP_OPEN), and the app
+    /// shows its mini-dock. Off: the plain tooltip (when the desktops can't be reached).
+    pub rich: bool,
 }
 
 fn copy(dst: &mut [u16], s: &str) {
@@ -49,10 +55,18 @@ fn load(path: &Path) -> Option<HICON> {
 
 impl Tray {
     pub fn new(hwnd: HWND) -> Self {
-        Tray { hwnd, icon: unsafe { LoadIconW(None, IDI_APPLICATION) }.unwrap_or_default(), own_icon: false, tip: String::new(), flashes: HashMap::new() }
+        Tray {
+            hwnd,
+            icon: unsafe { LoadIconW(None, IDI_APPLICATION) }.unwrap_or_default(),
+            own_icon: false,
+            tip: String::new(),
+            flashes: HashMap::new(),
+            rich: true,
+        }
     }
 
     fn data(&self, flags: windows::Win32::UI::Shell::NOTIFY_ICON_DATA_FLAGS) -> NOTIFYICONDATAW {
+        let flags = if self.rich || flags & NIF_TIP != NIF_TIP { flags } else { flags | NIF_SHOWTIP };
         let mut d = NOTIFYICONDATAW {
             cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
             hWnd: self.hwnd,
@@ -66,14 +80,32 @@ impl Tray {
         d
     }
 
-    /// Puts it in the tray (again after Explorer restarts).
+    /// Puts it in the tray (again after Explorer restarts), speaking version 4: the callback's
+    /// lParam has the event in its low word, wParam the icon's anchor point.
     pub fn add(&self) {
         let d = self.data(NIF_MESSAGE | NIF_ICON | NIF_TIP);
         unsafe {
             if !Shell_NotifyIconW(NIM_MODIFY, &d).as_bool() {
                 let _ = Shell_NotifyIconW(NIM_ADD, &d);
             }
+            let mut v = self.data(NIF_MESSAGE);
+            v.Anonymous.uVersion = NOTIFYICON_VERSION_4;
+            let _ = Shell_NotifyIconW(NIM_SETVERSION, &v);
         }
+    }
+
+    /// Back to the plain tooltip, or rich mode again.
+    pub fn set_rich(&mut self, rich: bool) {
+        if rich != self.rich {
+            self.rich = rich;
+            self.add();
+        }
+    }
+
+    /// Where the icon is on screen (to keep the mini-dock open while the mouse is on it).
+    pub fn rect(&self) -> Option<windows::Win32::Foundation::RECT> {
+        let nid = NOTIFYICONIDENTIFIER { cbSize: std::mem::size_of::<NOTIFYICONIDENTIFIER>() as u32, hWnd: self.hwnd, uID: ID, ..Default::default() };
+        unsafe { Shell_NotifyIconGetRect(&nid) }.ok()
     }
 
     pub fn remove(&self) {

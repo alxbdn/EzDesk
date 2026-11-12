@@ -117,4 +117,22 @@ impl Layered {
         }
         self.visible = false;
     }
+
+    /// Its memory DC (premultiplied 32-bit), to draw into with Direct2D.
+    pub fn dc(&self) -> HDC {
+        self.dc
+    }
+
+    /// Its window and its pixels, freed (for one made for a moment).
+    pub fn destroy(&mut self) {
+        use windows::Win32::Graphics::Gdi::{DeleteDC, DeleteObject, GetCurrentObject, OBJ_BITMAP};
+        unsafe {
+            let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(self.hwnd);
+            let bmp = GetCurrentObject(self.dc, OBJ_BITMAP);
+            let _ = DeleteDC(self.dc);
+            let _ = DeleteObject(bmp);
+        }
+        self.bits = std::ptr::null_mut();
+        self.visible = false;
+    }
 }
