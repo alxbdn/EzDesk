@@ -1,0 +1,523 @@
+<title>EzDesk Variantes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: one column of three studies (bumps, tray number, switch) plus a Task View preview; each study is a grid of live cards, the current design first. Single dark look on purpose: it mirrors EzDesk's own zinc UI. */
+:root {
+  --bg: #060607;        /* page */
+  --panel: #09090b;     /* shadcn popover, EzDesk ui::BG */
+  --raise: #18181b;     /* ui::ACCENT */
+  --line: #27272a;      /* ui::BORDER */
+  --fg: #fafafa;        /* ui::FG */
+  --muted: #a1a1aa;     /* ui::MUTED */
+  --dim: #71717a;
+  --blue: #2a82cc;      /* glow::COLORS[1] */
+  --ice: #8cc0ec;       /* glow::COLORS[2] */
+  --display: "Geist", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --text: "Segoe UI Variable Text", "Geist", "Segoe UI", system-ui, sans-serif;
+  --mono: "Geist Mono", "Cascadia Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--text); font-size: 15px; line-height: 1.55; }
+.wrap {
+  max-width: 1180px; margin: 0 auto;
+  padding-block: 56px 140px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 80px;
+}
+header { display: flex; flex-direction: column; gap: 18px; max-width: 70ch; }
+.brand { display: flex; align-items: center; gap: 12px; font-family: var(--mono); font-size: 13px; color: var(--muted); letter-spacing: .04em; }
+.brand canvas { width: 32px; height: 32px; }
+h1 { font-family: var(--display); font-weight: 600; font-size: clamp(32px, 5vw, 48px); line-height: 1.08; letter-spacing: -.025em; margin: 0; text-wrap: balance; }
+h1 .lit { background: linear-gradient(100deg, #0063b1, #8cc0ec 45%, #ffffff 55%, #2a82cc); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.lead { color: var(--muted); margin: 0; font-size: 16px; }
+.lead b { color: var(--fg); font-weight: 600; }
+
+section { display: flex; flex-direction: column; gap: 24px; }
+.sec-head { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; align-items: baseline; max-width: 80ch; }
+.sec-letter { font-family: var(--mono); font-size: 13px; color: var(--ice); border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; grid-row: span 2; align-self: start; margin-top: 6px; }
+h2 { font-family: var(--display); font-weight: 600; font-size: 24px; letter-spacing: -.015em; margin: 0; text-wrap: balance; }
+.sec-head p { margin: 0; color: var(--muted); grid-column: 2; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 16px; }
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 12px; display: flex; flex-direction: column; gap: 12px; min-width: 0;
+  transition: border-color .2s;
+}
+.card[data-picked="true"] { border-color: var(--ice); box-shadow: 0 0 0 1px var(--blue), 0 0 28px -6px rgba(42,130,204,.55); }
+.scene { width: 100%; aspect-ratio: 16 / 10; max-width: 100%; display: block; border-radius: 8px; background: #0b0d12; }
+.meta { display: flex; align-items: center; gap: 10px; padding-inline: 4px; }
+.code { font-family: var(--mono); font-size: 12px; color: var(--fg); background: var(--raise); border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 17px; margin: 0; letter-spacing: -.01em; }
+.now { font-family: var(--mono); font-size: 11px; color: var(--muted); border: 1px dashed #3f3f46; border-radius: 999px; padding: 0 8px; margin-left: auto; text-transform: uppercase; letter-spacing: .06em; }
+.card p { margin: 0; padding-inline: 4px; color: var(--muted); font-size: 14px; }
+.pick {
+  margin: auto 4px 2px; align-self: flex-start; font: 500 13px var(--text); color: var(--fg);
+  background: var(--raise); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer;
+}
+.pick:hover { background: var(--line); }
+.pick:focus-visible, .seg button:focus-visible, .bar button:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
+.card[data-picked="true"] .pick { background: var(--fg); color: var(--panel); border-color: var(--fg); }
+
+/* tray number cards */
+.strip { width: 100%; height: 48px; display: block; border-radius: 8px; }
+.loupes { display: flex; gap: 12px; padding-inline: 4px; flex-wrap: wrap; }
+.loupe { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.loupe canvas { width: 72px; height: 72px; image-rendering: pixelated; border-radius: 6px; background: var(--lbg, #1c1c1c); border: 1px solid var(--line); }
+.loupe span { font-family: var(--mono); font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; padding: 2px; gap: 2px; align-self: flex-start; background: var(--panel); }
+.seg button { font: 500 13px var(--text); color: var(--muted); background: none; border: 0; border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--raise); color: var(--fg); }
+.note { font-size: 13px; color: var(--dim); margin: 0; max-width: 80ch; }
+.note code { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+/* picks bar */
+.bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  padding-block: 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: rgba(9,9,11,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+}
+.bar-in { max-width: 1180px; margin: 0 auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bar-label { color: var(--muted); font-size: 14px; }
+.bar-picks { font-family: var(--mono); font-size: 14px; color: var(--fg); min-width: 0; overflow-wrap: anywhere; }
+.bar button { margin-left: auto; font: 500 13px var(--text); color: var(--panel); background: var(--fg); border: 0; border-radius: 8px; padding: 7px 14px; cursor: pointer; }
+.bar button:disabled { opacity: .4; cursor: default; }
+@media (max-width: 560px) { .sec-head { grid-template-columns: 1fr; } .sec-letter { grid-row: auto; justify-self: start; } .sec-head p { grid-column: 1; } }
+.grid.two { grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+.controls label { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
+.controls input[type="range"] { width: min(260px, 50vw); accent-color: var(--blue); }
+.controls input[type="checkbox"] { accent-color: var(--blue); width: 16px; height: 16px; }
+.controls output { font-family: var(--mono); font-size: 13px; color: var(--fg); min-width: 4ch; font-variant-numeric: tabular-nums; }
+.controls button { font: 500 13px var(--text); color: var(--fg); background: var(--raise); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.controls button:hover { background: var(--line); }
+.controls button:focus-visible, .controls input:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
+.mode { font-family: var(--mono); font-size: 12px; color: var(--dim); margin-left: auto; }
+.done { display: flex; flex-wrap: wrap; gap: 8px; }
+.done span { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+.done span b { color: var(--fg); font-weight: 500; }
+.done span.out { text-decoration: line-through; color: var(--dim); }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand"><canvas id="mark" width="64" height="64" aria-hidden="true"></canvas>EZDESK · RAIL · ROUND 2</div>
+    <h1>Le rail, <span class="lit">collé au bord</span></h1>
+    <p class="lead">Le rail ne se décolle plus : il est collé au bord de l'écran, et ses deux bouts fuient le long du bord en s'amincissant, comme l'eau qui remonte sur la paroi d'un verre. Il y a quatre façons de le dessiner. Choisis-en une et je la code.</p>
+    <div class="done" aria-label="Déjà décidé">
+      <span><b>B1</b> Rail</span><span><b>T1</b> Grand chiffre, en blanc pur</span><span><b>S1</b> Roulement</span><span class="out">V1 Task View</span>
+    </div>
+  </header>
+
+  <section aria-labelledby="h-r">
+    <div class="sec-head">
+      <span class="sec-letter">R</span>
+      <h2 id="h-r">Rail collé au bord</h2>
+      <p>En animation, la démo va à droite (bureau 1 → 2) puis revient à gauche (2 → 1). Pour regarder une position précise, prends le curseur : il fige la fenêtre à cette distance du bord. Le zoom ×2 grossit le bord pour juger les bouts.</p>
+    </div>
+    <div class="controls">
+      <label for="q">Proximité <input type="range" id="q" min="0" max="100" value="85"> <output id="qv" for="q">85 %</output></label>
+      <label for="charge"><input type="checkbox" id="charge"> Charge en cours</label>
+      <label for="zoom"><input type="checkbox" id="zoom"> Zoom ×2 sur le bord</label>
+      <button type="button" id="play">Reprendre l'animation</button>
+      <span class="mode" id="mode">animation</span>
+    </div>
+    <div class="grid two">
+      <article class="card" data-sec="R" data-code="R1">
+        <canvas class="scene" data-demo="rail" data-v="1" aria-label="Animation : rail collé au bord, bouts courts"></canvas>
+        <div class="meta"><span class="code">R1</span><h3>Ménisque</h3></div>
+        <p>Une bande d'épaisseur régulière collée au bord. Les bouts s'amincissent vite, en courbe creuse, et rejoignent le bord. C'est le plus proche de ce qui est installé, sans le décollement.</p>
+        <button class="pick" type="button">Choisir</button>
+      </article>
+      <article class="card" data-sec="R" data-code="R2">
+        <canvas class="scene" data-demo="rail" data-v="2" aria-label="Animation : rail avec de longues traînées le long du bord"></canvas>
+        <div class="meta"><span class="code">R2</span><h3>Film capillaire</h3></div>
+        <p>Le même corps, mais les bouts filent beaucoup plus loin le long du bord et deviennent un fil de plus en plus fin, comme un film d'eau qui monte.</p>
+        <button class="pick" type="button">Choisir</button>
+      </article>
+      <article class="card" data-sec="R" data-code="R3">
+        <canvas class="scene" data-demo="rail" data-v="3" aria-label="Animation : goutte allongée sur le bord"></canvas>
+        <div class="meta"><span class="code">R3</span><h3>Goutte</h3></div>
+        <p>Il n'y a pas de partie droite. C'est une goutte allongée posée sur le bord, plus épaisse au milieu, qui s'effile en longues pointes creuses aux deux bouts. Retenue, et raccourcie : 200 px de demi-longueur au bord au lieu de 310.</p>
+        <button class="pick" type="button">Choisir</button>
+      </article>
+      <article class="card" data-sec="R" data-code="R4">
+        <canvas class="scene" data-demo="rail" data-v="4" aria-label="Animation : fil lumineux le long du bord avec un cœur plus épais"></canvas>
+        <div class="meta"><span class="code">R4</span><h3>Fil + cœur</h3></div>
+        <p>Un fil de lumière très fin court le long du bord sur une grande hauteur et s'éteint en douceur. Au milieu, un cœur plus épais grossit à mesure que tu approches.</p>
+        <button class="pick" type="button">Choisir</button>
+      </article>
+    </div>
+  </section>
+</div>
+
+<div class="bar" role="region" aria-label="Ton choix">
+  <div class="bar-in">
+    <span class="bar-label">Ton choix</span>
+    <span class="bar-picks" id="picks" aria-live="polite">Rien de choisi pour l'instant</span>
+    <button type="button" id="copy" disabled>Copier</button>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+'use strict';
+const DPR = Math.min(window.devicePixelRatio || 1, 3);
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---- EzDesk's light (glow.rs): Windows blue brightening to white and back ----
+const COLORS = [0x0063B1, 0x2A82CC, 0x8CC0EC, 0xFFFFFF, 0x8CC0EC, 0x2A82CC];
+const FLOW = 2600;
+function colorAt(pos) { // pos in colour units, loops every COLORS.length; eased between stops like glow::color_at
+  const n = COLORS.length; pos = ((pos % n) + n) % n;
+  const i = Math.floor(pos); let k = pos - i; k = k * k * (3 - 2 * k);
+  const a = COLORS[i], b = COLORS[(i + 1) % n];
+  const m = s => Math.round(((a >> s) & 255) + ((((b >> s) & 255) - ((a >> s) & 255)) * k));
+  return [m(16), m(8), m(0)];
+}
+const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+const phaseOf = (t, period = FLOW) => (t % period) / period;
+// One cycle of the palette along (x0,y0)→(x1,y1), slid by ph: phase 1 is phase 0, so the loop never shows (ui::glow_brush).
+function flowGrad(ctx, x0, y0, x1, y1, ph) {
+  const g = ctx.createLinearGradient(x0, y0, x1, y1), N = 30;
+  for (let j = 0; j <= N; j++) g.addColorStop(j / N, rgba(colorAt((j / N - ph) * COLORS.length), 1));
+  return g;
+}
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const ease = k => k * k * (3 - 2 * k);
+const easeOut = k => 1 - Math.pow(1 - k, 3);
+const easeBack = k => { const c = 1.6; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
+
+// Rounded rect path starting top-middle, clockwise (so a dash traces it from the top).
+function rr(ctx, x, y, w, h, r) {
+  r = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.beginPath(); ctx.moveTo(x + w / 2, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+// ui::aura: a bright line on the edge, then thin rings fading outward (inward when steps < 0).
+function aura(ctx, x, y, w, h, r, steps, s, t, alpha = 1) {
+  const ph = phaseOf(t), len = w + h;
+  ctx.save(); ctx.strokeStyle = flowGrad(ctx, x - len * 0.1, y, x + len * 0.9, y + len * 0.35, ph);
+  const n = Math.abs(steps), dir = Math.sign(steps) || 1;
+  for (let k = 0; k <= n; k++) {
+    const e = dir * k * s, f = 1 - k / (n + 1);
+    ctx.globalAlpha = alpha * (k === 0 ? 0.95 : 0.42 * f * f);
+    ctx.lineWidth = (k === 0 ? 1.5 : 1.2) * s;
+    rr(ctx, x - e, y - e, w + 2 * e, h + 2 * e, Math.max(1, r + e)); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ---- digits centred on their real ink (like make-icons.ps1) ----
+const scratch = document.createElement('canvas').getContext('2d');
+const FONT = px => `700 ${px}px "Segoe UI Variable Display","Segoe UI","Geist",system-ui,sans-serif`;
+let inkRatio = null;
+function ratio() {
+  if (inkRatio) return inkRatio;
+  scratch.font = FONT(100); const m = scratch.measureText('8');
+  inkRatio = (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) / 100 || 0.72;
+  return inkRatio;
+}
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { inkRatio = null; });
+function digit(ctx, str, cx, cy, inkH, fill) {
+  ctx.font = FONT(inkH / ratio()); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  const m = ctx.measureText(str);
+  const w = m.actualBoundingBoxLeft + m.actualBoundingBoxRight, h = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
+  ctx.fillStyle = fill; ctx.fillText(str, cx - w / 2 + m.actualBoundingBoxLeft, cy + h / 2 - m.actualBoundingBoxDescent);
+}
+
+// ---- the tray number, five ways. S = the icon's side, in the context's units ----
+function trayIcon(ctx, v, x, y, S, num, t, o = {}) {
+  const ph = phaseOf(t, FLOW * 1.6);
+  const cx = x + S / 2, cy = y + S / 2;
+  const light = () => flowGrad(ctx, x - S * 0.3, y, x + S * 1.3, y + S * 0.5, ph);
+  ctx.save();
+  if (v === 0) {
+    const m = Math.max(1, Math.round(S * 0.04)), r = Math.max(2, Math.floor(S * 0.13));
+    rr(ctx, x + m, y + m, S - 2 * m, S - 2 * m, r); ctx.fillStyle = '#000'; ctx.fill();
+    drawNum(() => digit(ctx, String(num), cx, cy + (o.dy || 0), S * 0.5, '#4FA6EC'));
+  } else if (v === 1) {
+    rr(ctx, x, y, S, S, S * 0.24); ctx.fillStyle = '#09090b'; ctx.fill();
+    drawNum(() => digit(ctx, String(num), cx, cy + (o.dy || 0), S * 0.8, light()));
+  } else if (v === 2) {
+    rr(ctx, x, y, S, S, S * 0.26); ctx.fillStyle = '#09090b'; ctx.fill();
+    const lw = Math.max(1, Math.round(S / 14));
+    rr(ctx, x + lw / 2, y + lw / 2, S - lw, S - lw, S * 0.26 - lw / 2); ctx.lineWidth = lw; ctx.strokeStyle = light(); ctx.stroke();
+    drawNum(() => digit(ctx, String(num), cx, cy + (o.dy || 0), S * 0.62, '#fafafa'));
+  } else if (v === 3) {
+    rr(ctx, x, y, S, S, S * 0.24); ctx.fillStyle = light(); ctx.fill();
+    drawNum(() => digit(ctx, String(num), cx, cy + (o.dy || 0), S * 0.7, '#09090b'));
+  } else if (v === 4) {
+    rr(ctx, x, y, S, S, S * 0.22); ctx.fillStyle = '#09090b'; ctx.fill();
+    drawNum(() => digit(ctx, String(num), cx, y + S * 0.42 + (o.dy || 0), S * 0.6, light()));
+    const n = o.count || 4, bh = Math.max(1, Math.round(S / 10)), pad = Math.max(1, Math.round(S * 0.14)), gap = Math.max(1, Math.round(S / 16));
+    const bw = (S - 2 * pad - gap * (n - 1)) / n, by = y + S - pad - bh + Math.round(S * 0.04);
+    for (let i = 0; i < n; i++) {
+      ctx.fillStyle = (i + 1 === Number(num)) ? light() : '#3f3f46';
+      ctx.fillRect(x + pad + i * (bw + gap), by, bw, bh);
+    }
+  }
+  // the switch flash (tray.rs flash_frame): a blue rim, brightening a little at its peak
+  if (o.flash > 0) {
+    const w = Math.max(1.5, S / 9), r = S / 4;
+    rr(ctx, x + w / 2, y + w / 2, S - w, S - w, r - w / 2);
+    ctx.lineWidth = w; ctx.strokeStyle = rgba(colorAt(o.flash * 1.2), o.flash); ctx.stroke();
+  }
+  ctx.restore();
+  function drawNum(fn) {
+    if (o.roll) { // S1: two numbers in a clipped box, the old one leaving as the new one arrives
+      ctx.save(); rr(ctx, x, y, S, S, S * 0.2); ctx.clip();
+      const { from, to, k, dir } = o.roll, saved = num;
+      num = from; o.dy = -dir * S * k; fn();
+      num = to; o.dy = dir * S * (1 - k); fn();
+      num = saved; o.dy = 0; ctx.restore();
+    } else fn();
+  }
+}
+
+// ---- wallpapers of the demo desktops ----
+const WALL = { 1: ['#13233a', '#090b10'], 2: ['#123029', '#080c0b'], 3: ['#2a1d3a', '#0b0910'], 4: ['#33261a', '#0d0a08'] };
+const NAMES = { 1: 'Perso', 2: 'Code', 3: 'Live', 4: 'Mix' };
+function wall(ctx, x, y, w, h, d) {
+  const [a, b] = WALL[d] || WALL[1];
+  const g = ctx.createRadialGradient(x + w * 0.3, y + h * 0.25, 0, x + w * 0.3, y + h * 0.25, Math.max(w, h) * 0.9);
+  g.addColorStop(0, a); g.addColorStop(1, b); ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+}
+function slideWalls(ctx, W, H, from, to, p, dir) { // Windows' own slide between desktops
+  if (p <= 0 || from === to) { wall(ctx, 0, 0, W, H, from); return; }
+  if (p >= 1) { wall(ctx, 0, 0, W, H, to); return; }
+  const e = ease(p);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+  wall(ctx, -dir * W * e, 0, W, H, from); wall(ctx, dir * W * (1 - e), 0, W, H, to);
+  ctx.restore();
+}
+function taskbar(ctx, W, H, tb, s, iconFn, light = false) {
+  ctx.fillStyle = light ? 'rgba(238,238,240,.94)' : 'rgba(28,28,31,.94)'; ctx.fillRect(0, H - tb, W, tb);
+  ctx.fillStyle = light ? '#d4d4d8' : '#27272a'; ctx.fillRect(0, H - tb, W, Math.max(1, s * 0.6));
+  // centred app buttons, as on Windows 11
+  const bs = tb * 0.5, n = 5, gap = tb * 0.28, total = n * bs + (n - 1) * gap;
+  for (let i = 0; i < n; i++) {
+    rr(ctx, W / 2 - total / 2 + i * (bs + gap), H - tb / 2 - bs / 2, bs, bs, bs * 0.22);
+    ctx.fillStyle = light ? (i === 0 ? '#2a82cc' : '#c4c4cc') : (i === 0 ? '#2a82cc' : '#3f3f46'); ctx.fill();
+  }
+  ctx.fillStyle = light ? '#3f3f46' : '#a1a1aa'; ctx.font = `500 ${Math.round(tb * 0.26)}px "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif`;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText('02:41', W - tb * 0.3, H - tb / 2);
+  iconFn && iconFn(W - tb * 0.3 - ctx.measureText('02:41').width - tb * 0.35, H - tb / 2);
+}
+function heldWindow(ctx, cx, cy, W, H, s) { // the held window, 45 % see-through like EzDesk's held.rs
+  const w = W * 0.34, h = H * 0.44, x = cx - w * 0.42, y = cy - 11 * s;
+  ctx.save(); ctx.globalAlpha = 0.55;
+  rr(ctx, x, y, w, h, 7 * s); ctx.fillStyle = '#18181b'; ctx.fill();
+  ctx.lineWidth = 1; ctx.strokeStyle = '#3f3f46'; ctx.stroke();
+  ctx.fillStyle = '#27272a'; ctx.fillRect(x + 1, y + 1, w - 2, 20 * s);
+  ctx.fillStyle = '#3f3f46';
+  for (let i = 0; i < 4; i++) ctx.fillRect(x + 12 * s, y + 34 * s + i * 14 * s, w * (i % 2 ? 0.45 : 0.7), 6 * s);
+  ctx.restore();
+  // cursor
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(s, s);
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 16); ctx.lineTo(4.2, 12.2); ctx.lineTo(7, 18); ctx.lineTo(9.4, 17); ctx.lineTo(6.6, 11.2); ctx.lineTo(12, 11.2); ctx.closePath();
+  ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 1.1; ctx.strokeStyle = '#000'; ctx.stroke();
+  ctx.restore();
+}
+
+function plusMark(ctx, x, y, r, color, s) {
+  if (r <= 0) return;
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineWidth = 2 * s; ctx.strokeStyle = color;
+  ctx.beginPath(); ctx.moveTo(x - r, y); ctx.lineTo(x + r, y); ctx.moveTo(x, y - r); ctx.lineTo(x, y + r); ctx.stroke(); ctx.restore();
+}
+
+// ---- the tray number as installed now (T1 in pure white), with S1's rim flash ----
+function whiteIcon(ctx, x, y, S, num, flash = 0) {
+  ctx.save();
+  rr(ctx, x, y, S, S, S * 0.24); ctx.fillStyle = '#09090b'; ctx.fill();
+  digit(ctx, String(num), x + S / 2, y + S / 2, S * 0.8, '#ffffff');
+  if (flash > 0) {
+    const w = Math.max(1.5, S / 9);
+    rr(ctx, x + w / 2, y + w / 2, S - w, S - w, S * 0.24 - w / 2);
+    ctx.lineWidth = w; ctx.strokeStyle = rgba(colorAt(flash * 0.72), flash * 0.6); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ---- R: the rail glued to the edge, four profiles ----
+// Each profile: how thick the rail is (px at 100 %) at d px from its middle, along the edge.
+function profile(v, qq) {
+  const meniscus = (len, wid, tail, pow) => ({
+    span: len / 2 + tail, maxT: wid,
+    T: d => { d = Math.abs(d); if (d <= len / 2) return wid; const k = (d - len / 2) / tail; return k >= 1 ? 0 : wid * Math.pow(1 - k, pow); },
+  });
+  if (v === 1) return meniscus(50 + 230 * qq, 3 + 4 * qq, 26 + 30 * qq, 2);
+  if (v === 2) return meniscus(40 + 200 * qq, 3 + 4 * qq, 70 + 90 * qq, 3.2);
+  if (v === 3) {
+    const half = 90 + 110 * qq, wid = 4 + 7 * qq; // as built: 200 px at the edge
+    return { span: half, maxT: wid, T: d => { const u = Math.min(1, Math.abs(d) / half); return wid * Math.pow(1 - u * u, 2.4); } };
+  }
+  return Object.assign(meniscus(30 + 170 * qq, 3 + 4 * qq, 18 + 18 * qq, 2), { film: 130 + 170 * qq });
+}
+function railPath(ctx, p, side, edge, yc, s) {
+  const N = 120;
+  ctx.beginPath(); ctx.moveTo(edge, yc - p.span * s);
+  for (let i = 0; i <= N; i++) {
+    const d = -p.span + 2 * p.span * i / N;
+    ctx.lineTo(edge - side * p.T(d) * s, yc + d * s);
+  }
+  ctx.lineTo(edge, yc + p.span * s); ctx.closePath();
+}
+function rail(ctx, v, side, edge, yc, q, charge, bounce, avail, target, isNew, s, t) {
+  if (avail <= 0.01) return;
+  const qq = clamp(q + bounce * 0.5, 0, 1.4), p = profile(v, qq), ph = phaseOf(t);
+  const light = flowGrad(ctx, 0, yc + p.span * s * 2, 0, yc - p.span * s * 2, ph);
+  ctx.save(); ctx.globalAlpha = avail * (0.5 + 0.5 * clamp(q));
+  if (p.film) { // R4: a hairline running far along the edge, fading out at both ends
+    const n = 48, hs = p.film * s, w = 1.4 * s;
+    for (let i = 0; i < n; i++) {
+      const u = -1 + 2 * (i + 0.5) / n;
+      ctx.globalAlpha = avail * (0.5 + 0.5 * clamp(q)) * Math.pow(1 - Math.abs(u), 1.4);
+      ctx.fillStyle = light;
+      ctx.fillRect(side > 0 ? edge - w : edge, yc - hs + 2 * hs * i / n, w, 2 * hs / n + 0.5);
+    }
+    ctx.globalAlpha = avail * (0.5 + 0.5 * clamp(q));
+  }
+  railPath(ctx, p, side, edge, yc, s);
+  ctx.shadowColor = rgba(colorAt(ph * 6 + 1), 0.9); ctx.shadowBlur = (8 + 12 * qq) * s * DPR;
+  ctx.fillStyle = light; ctx.fill(); ctx.shadowBlur = 0;
+  if (charge > 0) { // white from the middle out, following the same shape
+    ctx.save(); ctx.beginPath(); const hc = p.span * s * Math.min(1, charge);
+    ctx.rect(side > 0 ? edge - 40 * s : edge, yc - hc, 40 * s, 2 * hc); ctx.clip();
+    railPath(ctx, p, side, edge, yc, s);
+    ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(255,255,255,.9)'; ctx.shadowBlur = 10 * s * DPR; ctx.fill();
+    ctx.restore();
+  }
+  // the tile with the desktop you'd land on
+  const cq = ease(clamp((q - 0.5) / 0.35));
+  if (cq > 0) {
+    const cs = 26 * s, cx = edge - side * (p.maxT * s + 14 * s + cs / 2 - (1 - cq) * 10 * s);
+    ctx.globalAlpha = avail * cq;
+    aura(ctx, cx - cs / 2, yc - cs / 2, cs, cs, 7 * s, 5, s, t, 1);
+    rr(ctx, cx - cs / 2, yc - cs / 2, cs, cs, 7 * s); ctx.fillStyle = '#09090b'; ctx.fill();
+    if (isNew) plusMark(ctx, cx, yc, 6 * s, '#fafafa', s); else digit(ctx, String(target), cx, yc, cs * 0.46, '#fafafa');
+  }
+  ctx.restore();
+}
+
+// ---- controls: animation, or a still position from the slider ----
+let manual = null, zoom = false;
+const qIn = document.getElementById('q'), qOut = document.getElementById('qv'), chIn = document.getElementById('charge');
+const zIn = document.getElementById('zoom'), modeOut = document.getElementById('mode');
+function setManual() {
+  manual = { q: Number(qIn.value) / 100, charge: chIn.checked ? 0.6 : 0 };
+  qOut.textContent = `${qIn.value} %`; modeOut.textContent = 'position figée';
+  if (REDUCED) demos.forEach(d => paint(d, d.still));
+}
+qIn.addEventListener('input', setManual);
+chIn.addEventListener('change', setManual);
+zIn.addEventListener('change', () => { zoom = zIn.checked; if (REDUCED) demos.forEach(d => paint(d, d.still)); });
+document.getElementById('play').addEventListener('click', () => { manual = null; modeOut.textContent = 'animation'; if (REDUCED) demos.forEach(d => paint(d, d.still)); });
+
+function railScene(v) {
+  return (ctx, W, H, t) => {
+    const s = H / 340, L = 5600, tb = Math.round(H * 0.09), scrH = H - tb, reach = W * 0.32, count = 3;
+    let dir, from, to, cx, charge, switched, since, bounce;
+    if (manual) {
+      dir = 1; from = to = 1; switched = false; since = 0; bounce = 0;
+      cx = W - (6 * s + (1 - manual.q) * reach); charge = manual.charge;
+    } else {
+      const lt = t % (2 * L), tt = lt % L;
+      dir = lt < L ? 1 : -1; from = dir > 0 ? 1 : 2; to = dir > 0 ? 2 : 1;
+      const T1 = 500, T2 = 1900, TC = 750, T3 = T2 + TC, T4 = T3 + 700, T5 = T4 + 1300;
+      const cx0 = W * 0.5, cxE = dir > 0 ? W - 5 * s : 5 * s;
+      cx = cx0;
+      if (tt >= T1 && tt < T2) cx = lerp(cx0, cxE, ease((tt - T1) / (T2 - T1)));
+      else if (tt >= T2 && tt < T4) cx = cxE;
+      else if (tt >= T4 && tt < T5) cx = lerp(cxE, cx0, ease((tt - T4) / (T5 - T4)));
+      switched = tt >= T3; since = tt - T3;
+      charge = tt >= T2 && tt < T3 ? (tt - T2) / TC : 0;
+      bounce = switched && since < 900 ? Math.exp(-since / 170) * Math.sin(since / 1000 * 15) : 0;
+    }
+    const cur = switched ? to : from, yc = scrH * 0.5, cy = scrH * 0.3;
+    ctx.save();
+    if (zoom) { const px = dir > 0 ? W : 0; ctx.beginPath(); ctx.rect(0, 0, W, scrH); ctx.clip(); ctx.translate(px, yc); ctx.scale(2, 2); ctx.translate(-px, -yc); }
+    slideWalls(ctx, W, scrH, from, to, switched ? clamp(since / 320) : 0, dir);
+    heldWindow(ctx, cx, cy, W, scrH, s);
+    let availL = 1;
+    if (dir > 0) availL = switched ? clamp(since / 350) : 0; else availL = switched ? 1 - clamp(since / 350) : 1;
+    for (const side of [-1, 1]) {
+      const edge = side > 0 ? W : 0, q = clamp(1 - (Math.abs(edge - cx) - 6 * s) / reach), mine = side === dir;
+      rail(ctx, v, side, edge, yc, q, mine ? charge : 0, mine ? bounce : 0, side < 0 ? availL : 1, cur + side, side > 0 && cur >= count, s, t);
+    }
+    ctx.restore();
+    const flash = switched && since < 600 ? Math.sin(Math.PI * since / 600) : 0;
+    taskbar(ctx, W, H, tb, s, (rx, cyb) => { const S = Math.round(tb * 0.5); whiteIcon(ctx, rx - S, Math.round(cyb - S / 2), S, cur, flash); });
+  };
+}
+
+// ---- wiring ----
+const demos = [];
+function addDemo(canvas, draw, opts = {}) {
+  const d = { canvas, ctx: canvas.getContext('2d'), draw, fixed: opts.fixed, still: opts.still ?? 2300, visible: true, w: 0, h: 0 };
+  demos.push(d);
+  if (!d.fixed) {
+    const size = () => { const r = canvas.getBoundingClientRect(); d.w = r.width; d.h = r.height; canvas.width = Math.max(1, Math.round(r.width * DPR)); canvas.height = Math.max(1, Math.round(r.height * DPR)); if (REDUCED) paint(d, d.still); };
+    new ResizeObserver(size).observe(canvas); size();
+  } else { d.w = canvas.width; d.h = canvas.height; }
+  io.observe(canvas);
+  return d;
+}
+function paint(d, t) {
+  const c = d.ctx;
+  if (d.fixed) { c.setTransform(1, 0, 0, 1, 0, 0); d.draw(c, d.w, d.h, t); return; }
+  if (!d.w || !d.h) return;
+  c.setTransform(DPR, 0, 0, DPR, 0, 0); c.clearRect(0, 0, d.w, d.h); d.draw(c, d.w, d.h, t);
+}
+const io = new IntersectionObserver(es => { for (const e of es) { const d = demos.find(x => x.canvas === e.target); if (d) d.visible = e.isIntersecting; } }, { rootMargin: '120px' });
+
+addDemo(document.getElementById('mark'), (ctx, W) => { ctx.clearRect(0, 0, W, W); whiteIcon(ctx, 4, 4, W - 8, 'E'); }, { fixed: true });
+document.querySelectorAll('[data-demo="rail"]').forEach(cv => addDemo(cv, railScene(Number(cv.dataset.v)), { still: 2250 }));
+
+function frame(now) {
+  for (const d of demos) if (d.visible) paint(d, now);
+  requestAnimationFrame(frame);
+}
+if (REDUCED) demos.forEach(d => paint(d, d.still));
+else requestAnimationFrame(frame);
+
+// the pick: one rail, kept in this browser only
+const KEY = 'ezdesk-rail-pick';
+let pick = null;
+try { pick = localStorage.getItem(KEY); } catch (e) { pick = null; }
+const out = document.getElementById('picks'), copy = document.getElementById('copy');
+function render() {
+  document.querySelectorAll('.card').forEach(c => {
+    const on = pick === c.dataset.code;
+    c.dataset.picked = String(on);
+    const b = c.querySelector('.pick'); b.setAttribute('aria-pressed', String(on)); b.textContent = on ? 'Choisi' : 'Choisir';
+  });
+  out.textContent = pick || "Rien de choisi pour l'instant";
+  copy.disabled = !pick;
+}
+document.querySelectorAll('.pick').forEach(b => b.addEventListener('click', () => {
+  const code = b.closest('.card').dataset.code;
+  pick = pick === code ? null : code;
+  try { if (pick) localStorage.setItem(KEY, pick); else localStorage.removeItem(KEY); } catch (e) {}
+  render();
+}));
+copy.addEventListener('click', () => {
+  const text = out.textContent;
+  const done = () => { copy.textContent = 'Copié'; setTimeout(() => { copy.textContent = 'Copier'; }, 1400); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, select); else select();
+  function select() { const r = document.createRange(); r.selectNodeContents(out); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+});
+render();
+})();
+</script>

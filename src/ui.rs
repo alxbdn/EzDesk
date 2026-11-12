@@ -107,16 +107,18 @@ pub fn glow_stops(rt: &ID2D1RenderTarget) -> Option<ID2D1GradientStopCollection>
     unsafe { rt.CreateGradientStopCollection(&stops, D2D1_GAMMA_2_2, D2D1_EXTEND_MODE_WRAP).ok() }
 }
 
-/// The aura round r (corners `radius`): a bright line on its edge, then `steps` thin rings fading
-/// outward, the colours flowing along it. One cycle of the palette is the vector v; it slides along
-/// itself by phase × v, so phase 1 is exactly phase 0: the loop doesn't show.
 /// The flowing light as a brush over r: one cycle of the palette is the vector v, sliding along
 /// itself by phase × v, so phase 1 is exactly phase 0 (the loop doesn't show).
 pub fn glow_brush(rt: &ID2D1RenderTarget, stops: &ID2D1GradientStopCollection, r: &R) -> Option<ID2D1LinearGradientBrush> {
     let len = (r.w + r.h).max(1.0); // the whole palette along it
-    let (vx, vy) = (len, len * 0.35);
+    flow_brush(rt, stops, r.x, r.y, len, len * 0.35)
+}
+
+/// The flowing light starting at (x, y), one cycle of the palette along the vector (vx, vy), in
+/// whatever direction (the bumps' rail: straight up).
+pub fn flow_brush(rt: &ID2D1RenderTarget, stops: &ID2D1GradientStopCollection, x: f32, y: f32, vx: f32, vy: f32) -> Option<ID2D1LinearGradientBrush> {
     let phase = flow_phase();
-    let (sx, sy) = (r.x + vx * phase, r.y + vy * phase);
+    let (sx, sy) = (x + vx * phase, y + vy * phase);
     let line = D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES { startPoint: D2D_POINT_2F { x: sx, y: sy }, endPoint: D2D_POINT_2F { x: sx + vx, y: sy + vy } };
     unsafe { rt.CreateLinearGradientBrush(&line, None, stops).ok() }
 }
@@ -141,13 +143,20 @@ pub fn glow_check(rt: &ID2D1RenderTarget, stops: &ID2D1GradientStopCollection, c
     }
 }
 
+/// The aura round r (corners `radius`): a bright line on its edge, then `steps` thin rings fading
+/// outward, the colours flowing along it.
 pub fn aura(rt: &ID2D1RenderTarget, stops: &ID2D1GradientStopCollection, r: &R, radius: f32, steps: u32, s: f32) {
+    aura_faded(rt, stops, r, radius, steps, s, 1.0);
+}
+
+/// The aura, × alpha (0 → 1: fading in).
+pub fn aura_faded(rt: &ID2D1RenderTarget, stops: &ID2D1GradientStopCollection, r: &R, radius: f32, steps: u32, s: f32, alpha: f32) {
     unsafe {
         let Some(g) = glow_brush(rt, stops, r) else { return };
         for k in 0..=steps {
             let e = k as f32 * s;
             let f = 1.0 - k as f32 / (steps + 1) as f32;
-            g.SetOpacity(if k == 0 { 0.95 } else { 0.42 * f * f });
+            g.SetOpacity(alpha * if k == 0 { 0.95 } else { 0.42 * f * f });
             rt.DrawRoundedRectangle(&rounded(&r.grow(e), radius + e), &g, if k == 0 { 1.5 * s } else { 1.2 * s }, None);
         }
     }

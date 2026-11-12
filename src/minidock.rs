@@ -610,6 +610,7 @@ mod tests {
         assert_eq!(hit(&l, 1.0, 1.0, true), Hit::None);
     }
 
+    #[test]
     fn dragging_a_card_makes_room_and_stays_in_the_row() {
         let slot = 100.0;
         // desktop 0 of 4 dragged 2.4 slots right: dropped at 2, cards 1 and 2 shift left

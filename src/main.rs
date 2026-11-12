@@ -9,11 +9,13 @@
 //!
 //! Modules: `desktops` (Windows' virtual desktops, behind one seam; `vda` is its adapter), `hold`
 //! (the gesture, from the press to the drop, as intents), `held` (the window in hand), `glow` and
-//! `bumps` (the light), `tray`, `hooks` (the mouse), `system` (settings, startup, taskbar).
+//! `bumps` (the light), `tray` and `badge` (the number), `hooks` (the mouse), `system` (settings,
+//! startup, taskbar).
 //! This file wires them to the main window's messages.
 
 #![windows_subsystem = "windows"]
 
+mod badge;
 mod bumps;
 mod coach;
 mod desktops;
@@ -57,7 +59,7 @@ const WM_DROP: u32 = WM_APP + 10;
 
 const T_TRAY: usize = 1;
 const T_HOLD: usize = 2;
-const T_FLASH: usize = 3;
+const T_BADGE: usize = 3;
 const T_CHECK_TRAY: usize = 4;
 const T_WELCOME: usize = 5;
 const T_OFFER: usize = 6;
@@ -139,9 +141,8 @@ struct App {
     warned: bool,
     last_step: u64,
     note: Option<(Note, Option<Note>)>,
-    flash: Vec<HICON>,
-    flash_step: usize,
-    flash_base: PathBuf,
+    badge: Option<badge::Badge>, // the tray number, drawn live (None: the .ico files)
+    badge_busy: bool,
     taskbar_created: u32,
     dock: Option<Dock>,
     dock_anchor: RECT, // the tray icon, when the dock opened
@@ -219,14 +220,15 @@ impl App {
         }
         let switched = self.shown.0 >= 0 && i != self.shown.0; // a real switch, not the first reading
         self.shown = (i, c);
-        let path = self.icon_path(i + 1);
-        self.tray.set_icon(&path);
+        match self.badge.as_mut() {
+            Some(b) => {
+                b.set(i + 1, win::now()); // rolls on a switch
+                self.badge_tick();
+            }
+            None => self.tray.set_icon(&self.icon_path(i + 1)),
+        }
         if switched {
             self.timer(T_OFFER, 1500); // once the slide is over
-            self.flash = self.tray.flash(&path);
-            self.flash_step = 0;
-            self.flash_base = path;
-            self.timer(T_FLASH, 60);
         }
         let tip = match self.desk.name(i) {
             Some(n) => format!("Desktop {} of {c} — {n}", i + 1),
@@ -493,15 +495,21 @@ impl App {
         self.timer(T_DOCK_REFRESH, 150); // the new name
     }
 
-    fn flash_frame(&mut self) {
-        if self.flash_step >= self.flash.len() {
-            self.stop(T_FLASH);
-            let base = self.flash_base.clone();
-            self.tray.set_icon(&base); // back to the plain number
-            return;
+    /// The tray number's next frame. It's still, except while it rolls: frames come every
+    /// BUSY_MS then, and stop with the last one, the number at rest.
+    fn badge_tick(&mut self) {
+        let now = win::now();
+        let Some(b) = self.badge.as_mut() else { return };
+        let busy = b.busy(now);
+        if let Some(icon) = b.frame(now) {
+            self.tray.set_drawn(icon);
         }
-        self.tray.set_frame(self.flash[self.flash_step]);
-        self.flash_step += 1;
+        if busy && !self.badge_busy {
+            self.timer(T_BADGE, badge::BUSY_MS);
+        } else if !busy && self.badge_busy {
+            self.stop(T_BADGE);
+        }
+        self.badge_busy = busy;
     }
 
     // ---- Scroll on the taskbar ----
@@ -803,7 +811,7 @@ unsafe extern "system" fn wndproc(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
             with(|a| match id {
                 T_TRAY => a.update_tray(),
                 T_HOLD => a.hold_tick(),
-                T_FLASH => a.flash_frame(),
+                T_BADGE => a.badge_tick(),
                 T_OFFER => {
                     a.stop(T_OFFER);
                     a.offer_taskbar_all_desktops();
@@ -1283,9 +1291,8 @@ fn main() {
         warned: false,
         last_step: 0,
         note: None,
-        flash: vec![],
-        flash_step: 0,
-        flash_base: PathBuf::new(),
+        badge: badge::Badge::new(),
+        badge_busy: false,
         taskbar_created,
         dock,
         dock_anchor: RECT::default(),
