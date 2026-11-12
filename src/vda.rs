@@ -1,6 +1,7 @@
-//! The app's adapter for the Desktops module: the VirtualDesktopAccessor DLL (its Windows 11 or
-//! Windows 10 build, next to EzDesk.exe) and Windows' own Ctrl+Win shortcuts, which slide where
-//! the DLL's switch is instant.
+//! The Desktops module's adapter for Windows before 11 24H2 (and the fallback after it): the
+//! VirtualDesktopAccessor DLL (its Windows 11 or Windows 10 build, next to EzDesk.exe) and
+//! Windows' own Ctrl+Win shortcuts, which slide where the DLL's switch is instant. Windows 11 24H2
+//! and later use `native.rs` instead, compiled in.
 //!
 //! A DLL that doesn't match this Windows build crashes (access violation) instead of returning an
 //! error, and a Rust program can't catch that. So before using it, EzDesk tries it in a child
@@ -23,12 +24,25 @@ type FnHwnd = unsafe extern "system" fn(isize) -> i32;
 type FnMove = unsafe extern "system" fn(isize, i32) -> i32;
 type FnHook = unsafe extern "system" fn(isize, u32) -> i32;
 type FnName = unsafe extern "system" fn(i32, *mut u8, usize) -> i32;
+type FnGo = unsafe extern "system" fn(i32);
+type FnRemove = unsafe extern "system" fn(i32, i32) -> i32;
+type FnSetName = unsafe extern "system" fn(i32, *const u8) -> i32;
+
+/// Optional calls: not in every build of the DLL (Windows 10's has none of these but the first).
+struct More {
+    window_desktop: Option<FnHwnd>,
+    create: Option<FnInt>,
+    remove: Option<FnRemove>,
+    set_name: Option<FnSetName>,
+}
 
 pub struct VdaAdapter {
+    more: More,
     count: Option<FnInt>,
     current: Option<FnInt>,
     move_window: Option<FnMove>,
     hook: Option<FnHook>,
+    go_to: Option<FnGo>,
     name: Option<FnName>,
     pin: Option<FnHwnd>,
     unpin: Option<FnHwnd>,
@@ -49,10 +63,17 @@ impl VdaAdapter {
         let f = |name: &str| proc(h, name);
         let a = unsafe {
             VdaAdapter {
+                more: More {
+                    window_desktop: f("GetWindowDesktopNumber").map(|p| std::mem::transmute::<_, FnHwnd>(p)),
+                    create: f("CreateDesktop").map(|p| std::mem::transmute::<_, FnInt>(p)),
+                    remove: f("RemoveDesktop").map(|p| std::mem::transmute::<_, FnRemove>(p)),
+                    set_name: f("SetDesktopName").map(|p| std::mem::transmute::<_, FnSetName>(p)),
+                },
                 count: f("GetDesktopCount").map(|p| std::mem::transmute::<_, FnInt>(p)),
                 current: f("GetCurrentDesktopNumber").map(|p| std::mem::transmute::<_, FnInt>(p)),
                 move_window: f("MoveWindowToDesktopNumber").map(|p| std::mem::transmute::<_, FnMove>(p)),
                 hook: f("RegisterPostMessageHook").map(|p| std::mem::transmute::<_, FnHook>(p)),
+                go_to: f("GoToDesktopNumber").map(|p| std::mem::transmute::<_, FnGo>(p)),
                 name: f("GetDesktopName").map(|p| std::mem::transmute::<_, FnName>(p)), // Windows 11 build only
                 pin: f("PinWindow").map(|p| std::mem::transmute::<_, FnHwnd>(p)),
                 unpin: f("UnPinWindow").map(|p| std::mem::transmute::<_, FnHwnd>(p)),
@@ -67,7 +88,7 @@ impl VdaAdapter {
 
     /// One DLL with nothing in it: for when the probe crashed. Everything is a no-op.
     pub fn broken() -> Self {
-        VdaAdapter { count: None, current: None, move_window: None, hook: None, name: None, pin: None, unpin: None, broken: Cell::new(true) }
+        VdaAdapter { more: More { window_desktop: None, create: None, remove: None, set_name: None }, count: None, current: None, move_window: None, hook: None, go_to: None, name: None, pin: None, unpin: None, broken: Cell::new(true) }
     }
 }
 
@@ -77,8 +98,12 @@ fn proc(h: HMODULE, name: &str) -> Option<unsafe extern "system" fn() -> isize> 
 }
 
 /// Runs in the child process: a few calls into the DLL. Exit code 0 = it answered (even "not
-/// ready yet", -1), anything else = it crashed.
-pub fn probe(build: u32) -> i32 {
+/// ready yet", -1), anything else = it crashed. what: "dll", or "native" (winvd: 0 only when it
+/// sees desktops, so a build it doesn't know falls back to the DLL).
+pub fn probe(build: u32, what: &str) -> i32 {
+    if what == "native" {
+        return if crate::native::NativeAdapter::new().count() > 0 { 0 } else { 3 };
+    }
     match VdaAdapter::load(build) {
         Ok(a) => {
             let _ = (a.count(), a.current());
@@ -88,18 +113,18 @@ pub fn probe(build: u32) -> i32 {
     }
 }
 
-/// Asks a child process to try the DLL. true = safe to use here.
-pub fn probe_ok() -> bool {
+/// Asks a child process to try "dll" or "native". true = safe to use here.
+pub fn probe_ok(what: &str) -> bool {
     let Ok(exe) = std::env::current_exe() else { return true };
-    let Ok(mut child) = Command::new(exe).arg("--probe").creation_flags(0x0800_0000).spawn() else { return true }; // CREATE_NO_WINDOW
+    let Ok(mut child) = Command::new(exe).args(["--probe", what]).creation_flags(0x0800_0000).spawn() else { return true }; // CREATE_NO_WINDOW
     for _ in 0..100 {
         if let Ok(Some(status)) = child.try_wait() {
             return status.code() == Some(0);
         }
         std::thread::sleep(Duration::from_millis(50));
     }
-    let _ = child.kill(); // hung for 5 s: Windows isn't ready, not a crash; try it anyway
-    true
+    let _ = child.kill(); // hung for 5 s: Windows isn't ready, not a crash; the DLL is tried anyway
+    what == "dll"
 }
 
 impl Adapter for VdaAdapter {
@@ -146,6 +171,40 @@ impl Adapter for VdaAdapter {
     fn slide_new(&self) {
         win::press(&[VK_LCONTROL, VK_LWIN, VK_D]); // makes one at the end and slides there, on Windows 10 too
     }
+    fn go_to(&self, i: i32) {
+        if let Some(f) = self.go_to {
+            unsafe { f(i) };
+        }
+    }
+    fn window_desktop(&self, hwnd: Hwnd) -> i32 {
+        self.more.window_desktop.map_or(-1, |f| unsafe { f(hwnd) })
+    }
+    fn can_manage(&self) -> bool {
+        self.more.create.is_some() && self.more.remove.is_some() && self.more.set_name.is_some()
+    }
+    fn create(&self) {
+        if let Some(f) = self.more.create {
+            unsafe { f() };
+        }
+    }
+    fn remove(&self, i: i32, fallback: i32) {
+        if let Some(f) = self.more.remove {
+            unsafe { f(i, fallback) };
+        }
+    }
+    fn set_name(&self, i: i32, name: &str) {
+        if let Some(f) = self.more.set_name {
+            let utf8: Vec<u8> = name.bytes().chain(Some(0)).collect();
+            unsafe { f(i, utf8.as_ptr()) };
+        }
+    }
+    fn wallpaper(&self, _: i32) -> Option<String> {
+        None // as Windows keeps it: Desktops looks in the registry
+    }
+    fn can_reorder(&self) -> bool {
+        false // the DLL has no call for it
+    }
+    fn move_desktop(&self, _: i32, _: i32) {}
     fn listen(&self, hwnd: Hwnd, msg: u32) {
         if let Some(f) = self.hook {
             unsafe { f(hwnd, msg) };

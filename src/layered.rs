@@ -1,5 +1,5 @@
 //! A layered window (per-pixel alpha) that clicks go through, never activated, not in the
-//! taskbar, always on top: what the glowing bumps are drawn into.
+//! taskbar, always on top: what the rails and the Settings guide are drawn into (with Direct2D).
 
 use crate::win;
 use std::sync::Once;
@@ -76,14 +76,6 @@ impl Layered {
         }
     }
 
-    /// Its pixels: premultiplied 0xAARRGGBB, row by row.
-    pub fn pixels(&mut self) -> &mut [u32] {
-        if self.bits.is_null() {
-            return &mut [];
-        }
-        unsafe { std::slice::from_raw_parts_mut(self.bits, self.w * self.h) }
-    }
-
     /// Shows its pixels at (x, y), × alpha.
     pub fn put(&self, x: i32, y: i32, alpha: u8) {
         let blend = BLENDFUNCTION { BlendOp: AC_SRC_OVER as u8, BlendFlags: 0, SourceConstantAlpha: alpha, AlphaFormat: AC_SRC_ALPHA as u8 };
@@ -115,6 +107,33 @@ impl Layered {
         unsafe {
             let _ = ShowWindow(self.hwnd, SW_HIDE);
         }
+        self.visible = false;
+    }
+
+    /// A copy of its pixels (premultiplied 0xAARRGGBB, row by row), to look at them in tests.
+    #[cfg(test)]
+    pub fn snapshot(&self) -> Vec<u32> {
+        if self.bits.is_null() {
+            return vec![];
+        }
+        unsafe { std::slice::from_raw_parts(self.bits, self.w * self.h) }.to_vec()
+    }
+
+    /// Its memory DC (premultiplied 32-bit), to draw into with Direct2D.
+    pub fn dc(&self) -> HDC {
+        self.dc
+    }
+
+    /// Its window and its pixels, freed (for one made for a moment).
+    pub fn destroy(&mut self) {
+        use windows::Win32::Graphics::Gdi::{DeleteDC, DeleteObject, GetCurrentObject, OBJ_BITMAP};
+        unsafe {
+            let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(self.hwnd);
+            let bmp = GetCurrentObject(self.dc, OBJ_BITMAP);
+            let _ = DeleteDC(self.dc);
+            let _ = DeleteObject(bmp);
+        }
+        self.bits = std::ptr::null_mut();
         self.visible = false;
     }
 }

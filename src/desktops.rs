@@ -26,8 +26,50 @@ pub trait Adapter {
     fn slide_right(&self);
     /// Makes a desktop at the end and slides there.
     fn slide_new(&self);
+    /// Straight to desktop i, no slide.
+    fn go_to(&self, i: i32);
     /// Windows posts msg to hwnd on every switch.
     fn listen(&self, hwnd: Hwnd, msg: u32);
+    /// The desktop a window is on (-1: can't tell).
+    fn window_desktop(&self, hwnd: Hwnd) -> i32;
+    /// Make, close and rename desktops without going there: Windows 11 only.
+    fn can_manage(&self) -> bool;
+    /// One more at the end, without going there.
+    fn create(&self);
+    /// Closes desktop i; its windows go to desktop fallback.
+    fn remove(&self, i: i32, fallback: i32);
+    fn set_name(&self, i: i32, name: &str);
+    /// Its wallpaper's file, when the adapter knows it.
+    fn wallpaper(&self, i: i32) -> Option<String>;
+    /// Desktops can be reordered (Windows 11 24H2+, compiled in).
+    fn can_reorder(&self) -> bool;
+    /// Desktop i moves to position to; the others shift over.
+    fn move_desktop(&self, i: i32, to: i32);
+}
+
+/// Either adapter, picked at start-up by Windows build.
+impl Adapter for Box<dyn Adapter> {
+    fn broken(&self) -> bool { (**self).broken() }
+    fn can_pin(&self) -> bool { (**self).can_pin() }
+    fn count(&self) -> i32 { (**self).count() }
+    fn current(&self) -> i32 { (**self).current() }
+    fn name(&self, i: i32) -> Option<String> { (**self).name(i) }
+    fn move_window(&self, hwnd: Hwnd, i: i32) { (**self).move_window(hwnd, i) }
+    fn pin(&self, hwnd: Hwnd) -> bool { (**self).pin(hwnd) }
+    fn unpin(&self, hwnd: Hwnd) { (**self).unpin(hwnd) }
+    fn slide_left(&self) { (**self).slide_left() }
+    fn slide_right(&self) { (**self).slide_right() }
+    fn slide_new(&self) { (**self).slide_new() }
+    fn go_to(&self, i: i32) { (**self).go_to(i) }
+    fn listen(&self, hwnd: Hwnd, msg: u32) { (**self).listen(hwnd, msg) }
+    fn window_desktop(&self, hwnd: Hwnd) -> i32 { (**self).window_desktop(hwnd) }
+    fn can_manage(&self) -> bool { (**self).can_manage() }
+    fn create(&self) { (**self).create() }
+    fn remove(&self, i: i32, fallback: i32) { (**self).remove(i, fallback) }
+    fn set_name(&self, i: i32, name: &str) { (**self).set_name(i, name) }
+    fn wallpaper(&self, i: i32) -> Option<String> { (**self).wallpaper(i) }
+    fn can_reorder(&self) -> bool { (**self).can_reorder() }
+    fn move_desktop(&self, i: i32, to: i32) { (**self).move_desktop(i, to) }
 }
 
 pub struct Desktops<A: Adapter> {
@@ -83,6 +125,76 @@ impl<A: Adapter> Desktops<A> {
         self.a.unpin(hwnd);
     }
 
+    /// Straight to desktop i, if there's one.
+    pub fn go_to(&self, i: i32) {
+        if i >= 0 && i < self.count() {
+            self.a.go_to(i);
+        }
+    }
+
+    pub fn window_desktop(&self, hwnd: Hwnd) -> i32 {
+        self.a.window_desktop(hwnd)
+    }
+
+    /// Desktops can be made, closed and renamed from EzDesk (Windows 11).
+    pub fn can_manage(&self) -> bool {
+        !self.a.broken() && self.a.can_manage()
+    }
+
+    /// A new desktop at the end, without going there; where it can't be made that way (Windows
+    /// 10), Windows makes it and slides there. True if you stayed where you were.
+    pub fn create(&self) -> bool {
+        if self.can_manage() {
+            self.a.create();
+            true
+        } else {
+            self.a.slide_new();
+            false
+        }
+    }
+
+    /// Closes desktop i: its windows go to the one before it (the next one for desktop 1). Never
+    /// the last desktop. True if it was closed.
+    pub fn remove(&self, i: i32) -> bool {
+        let count = self.count();
+        if !self.can_manage() || count < 2 || i < 0 || i >= count {
+            return false;
+        }
+        self.a.remove(i, if i > 0 { i - 1 } else { 1 });
+        true
+    }
+
+    pub fn can_reorder(&self) -> bool {
+        !self.a.broken() && self.a.can_reorder()
+    }
+
+    /// Desktop i to position to (both 0-based, the others shift over). True if it moved.
+    pub fn move_desktop(&self, i: i32, to: i32) -> bool {
+        let count = self.count();
+        if !self.can_reorder() || i == to || i < 0 || to < 0 || i >= count || to >= count {
+            return false;
+        }
+        self.a.move_desktop(i, to);
+        true
+    }
+
+    /// Renames desktop i (an empty name gives it back its "Desktop n").
+    pub fn rename(&self, i: i32, name: &str) {
+        if self.can_manage() && i >= 0 && i < self.count() {
+            self.a.set_name(i, name.trim());
+        }
+    }
+
+    /// "Desktop 2", or its own name.
+    pub fn label(&self, i: i32) -> String {
+        self.name(i).unwrap_or_else(|| format!("Desktop {}", i + 1))
+    }
+
+    /// Desktop i's wallpaper file: as the adapter knows it, else as Windows keeps it.
+    pub fn wallpaper(&self, i: i32) -> Option<String> {
+        self.a.wallpaper(i).filter(|p| !p.is_empty() && std::path::Path::new(p).exists()).or_else(|| crate::system::desktop_wallpaper(i))
+    }
+
     /// One desktop left (side -1) or right (+1), with Windows' own slide. or_new: past the last
     /// one, make a new one and go there. Returns true if it switched.
     pub fn slide(&self, side: i32, or_new: bool) -> bool {
@@ -118,6 +230,7 @@ pub mod fake {
         pub names: HashMap<i32, String>,
         pub log: RefCell<Vec<String>>,
         pub can_pin: bool,
+        pub can_manage: bool,
     }
 
     impl FakeDesktops {
@@ -129,6 +242,7 @@ pub mod fake {
                 names: HashMap::new(),
                 log: RefCell::new(vec![]),
                 can_pin: true,
+                can_manage: true,
             }
         }
         pub fn says(&self) -> String {
@@ -159,7 +273,25 @@ pub mod fake {
             *self.n.borrow_mut() += 1;
             *self.cur.borrow_mut() = *self.n.borrow() - 1;
         }
+        fn go_to(&self, i: i32) {
+            self.log.borrow_mut().push(format!("goto {i}"));
+            *self.cur.borrow_mut() = i;
+        }
         fn listen(&self, _: Hwnd, _: u32) {}
+        fn window_desktop(&self, _: Hwnd) -> i32 { 0 }
+        fn can_manage(&self) -> bool { self.can_manage }
+        fn create(&self) {
+            self.log.borrow_mut().push("create".into());
+            *self.n.borrow_mut() += 1;
+        }
+        fn remove(&self, i: i32, fallback: i32) {
+            self.log.borrow_mut().push(format!("remove {i} {fallback}"));
+            *self.n.borrow_mut() -= 1;
+        }
+        fn set_name(&self, i: i32, name: &str) { self.log.borrow_mut().push(format!("name {i} {name}")) }
+        fn wallpaper(&self, _: i32) -> Option<String> { None }
+        fn can_reorder(&self) -> bool { self.can_manage }
+        fn move_desktop(&self, i: i32, to: i32) { self.log.borrow_mut().push(format!("move desktop {i} {to}")) }
     }
 }
 
@@ -193,6 +325,57 @@ mod tests {
         assert_eq!(d.a.says(), "new");
         assert!(d.slide(-1, false));
         assert_eq!(d.current(), 2);
+    }
+
+    #[test]
+    fn go_to_only_existing_desktops() {
+        let d = Desktops::new(FakeDesktops::new(3, 0));
+        d.go_to(2);
+        d.go_to(3);
+        d.go_to(-1);
+        assert_eq!(d.a.says(), "goto 2");
+    }
+
+    #[test]
+    fn remove_never_the_last_and_windows_go_next_door() {
+        let d = Desktops::new(FakeDesktops::new(3, 0));
+        assert!(d.remove(0));
+        assert!(d.remove(1));
+        assert!(!d.remove(0), "the last one");
+        assert_eq!(d.a.says(), "remove 0 1, remove 1 0");
+    }
+
+    #[test]
+    fn windows_10_makes_and_goes_but_never_closes() {
+        let mut f = FakeDesktops::new(2, 0);
+        f.can_manage = false;
+        let d = Desktops::new(f);
+        assert!(!d.create(), "made by sliding there");
+        assert!(!d.remove(1));
+        d.rename(0, "Mail");
+        assert_eq!(d.a.says(), "new");
+    }
+
+    #[test]
+    fn reorder_only_real_moves() {
+        let d = Desktops::new(FakeDesktops::new(3, 0));
+        assert!(d.move_desktop(0, 2));
+        assert!(!d.move_desktop(1, 1), "same place");
+        assert!(!d.move_desktop(1, 3), "no position 4");
+        assert_eq!(d.a.says(), "move desktop 0 2");
+        let mut f = FakeDesktops::new(3, 0);
+        f.can_manage = false;
+        assert!(!Desktops::new(f).move_desktop(0, 2), "not with the DLL");
+    }
+
+    #[test]
+    fn create_stays_and_rename_trims() {
+        let d = Desktops::new(FakeDesktops::new(2, 0));
+        assert!(d.create());
+        d.rename(1, "  Mail ");
+        d.rename(5, "nope");
+        assert_eq!(d.a.says(), "create, name 1 Mail");
+        assert_eq!(d.label(0), "Desktop 1");
     }
 
     #[test]

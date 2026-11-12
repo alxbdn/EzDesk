@@ -5,19 +5,19 @@
 use crate::win::{pcw, wide};
 use std::path::PathBuf;
 use windows::core::{PCWSTR, PWSTR};
-use windows::Win32::Foundation::{HWND, LPARAM, POINT, RECT, WPARAM};
+use windows::Win32::Foundation::{HWND, POINT, RECT};
 use windows::Win32::Storage::Packaging::Appx::GetCurrentPackageFullName;
 use windows::Win32::System::Com::CLSIDFromString;
 use windows::Win32::System::Registry::{
     RegCloseKey, RegDeleteKeyValueW, RegEnumKeyExW, RegGetValueW, RegOpenKeyExW, RegSetKeyValueW, HKEY, HKEY_CURRENT_USER,
-    HKEY_LOCAL_MACHINE, KEY_READ, REG_DWORD, REG_SZ, RRF_RT_REG_DWORD, RRF_RT_REG_SZ,
+    HKEY_LOCAL_MACHINE, KEY_READ, REG_SZ, RRF_RT_REG_DWORD, RRF_RT_REG_SZ,
 };
 use windows::Win32::System::WindowsProgramming::{GetPrivateProfileStringW, WritePrivateProfileStringW};
 use windows::Win32::UI::Shell::{
     IsUserAnAdmin, SHGetKnownFolderPath, ShellExecuteW, Shell_NotifyIconGetRect, KF_FLAG_DEFAULT, NOTIFYICONIDENTIFIER,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    FindWindowExW, FindWindowW, GetWindowRect, SendMessageTimeoutW, HWND_BROADCAST, SMTO_ABORTIFHUNG, SW_SHOWNORMAL, WM_SETTINGCHANGE,
+    FindWindowExW, FindWindowW, GetWindowRect, SW_SHOWNORMAL,
 };
 
 // ---- Settings: %APPDATA%\EzDesk\settings.ini, as earlier versions wrote it ----
@@ -85,12 +85,6 @@ fn reg_string(root: HKEY, sub: &str, name: &str) -> Option<String> {
     Some(String::from_utf16_lossy(&buf[..len]))
 }
 
-fn reg_set_dword(sub: &str, name: &str, v: u32) {
-    let (s, n) = (wide(sub), wide(name));
-    unsafe {
-        let _ = RegSetKeyValueW(HKEY_CURRENT_USER, pcw(&s), pcw(&n), REG_DWORD.0, Some(&v as *const u32 as *const _), 4);
-    }
-}
 
 fn reg_set_string(sub: &str, name: &str, v: &str) {
     let (s, n, d) = (wide(sub), wide(name), wide(v));
@@ -104,6 +98,35 @@ fn reg_delete(sub: &str, name: &str) {
     unsafe {
         let _ = RegDeleteKeyValueW(HKEY_CURRENT_USER, pcw(&s), pcw(&n));
     }
+}
+
+/// A GUID as the registry stores it (16 bytes) → "{xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}".
+pub fn guid_from_bytes(b: &[u8]) -> String {
+    format!(
+        "{{{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
+        b[3], b[2], b[1], b[0], b[5], b[4], b[7], b[6], b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15]
+    )
+}
+
+/// Desktop i's wallpaper (Windows 11 gives each desktop its own), else the current one.
+pub fn desktop_wallpaper(i: i32) -> Option<String> {
+    const VD: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\VirtualDesktops";
+    let exists = |p: &String| !p.is_empty() && std::path::Path::new(p).exists();
+    let (s, n) = (wide(VD), wide("VirtualDesktopIDs"));
+    let mut ids = vec![0u8; 16 * 64];
+    let mut size = ids.len() as u32;
+    let ok = unsafe {
+        RegGetValueW(HKEY_CURRENT_USER, pcw(&s), pcw(&n), windows::Win32::System::Registry::RRF_RT_REG_BINARY, None, Some(ids.as_mut_ptr() as *mut _), Some(&mut size))
+    }
+    .is_ok();
+    let own = (ok && i >= 0 && (i as u32 + 1) * 16 <= size)
+        .then(|| guid_from_bytes(&ids[i as usize * 16..i as usize * 16 + 16]))
+        .and_then(|g| reg_string(HKEY_CURRENT_USER, &format!(r"{VD}\Desktops\{g}"), "Wallpaper"))
+        .filter(exists);
+    own.or_else(|| reg_string(HKEY_CURRENT_USER, r"Control Panel\Desktop", "WallPaper").filter(exists)).or_else(|| {
+        let t = PathBuf::from(std::env::var_os("APPDATA").unwrap_or_default()).join(r"Microsoft\Windows\Themes\TranscodedWallpaper");
+        t.exists().then(|| t.to_string_lossy().into_owned())
+    })
 }
 
 /// This Windows' build number (22000+ is Windows 11).
@@ -167,21 +190,13 @@ pub fn remove_startup_shortcuts() -> bool {
 }
 
 // ---- Taskbar: show apps from all desktops (Windows' own setting) ----
-// VirtualDesktopTaskbarFilter = 0 is "On all desktops". A packaged app's registry writes go to a
-// private copy, so the Store app opens the Settings page instead.
+// VirtualDesktopTaskbarFilter = 0 is "On all desktops". Only read: Explorer takes it into account
+// when its Settings page changes it, not when an app writes it, so EzDesk opens that page.
 
 const EXPLORER_ADV: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
 
 pub fn taskbar_all_desktops() -> bool {
     reg_dword(HKEY_CURRENT_USER, EXPLORER_ADV, "VirtualDesktopTaskbarFilter").unwrap_or(1) == 0
-}
-
-pub fn set_taskbar_all_desktops(on: bool) {
-    reg_set_dword(EXPLORER_ADV, "VirtualDesktopTaskbarFilter", if on { 0 } else { 1 });
-    let what = wide("TraySettings");
-    unsafe {
-        SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, WPARAM(0), LPARAM(what.as_ptr() as isize), SMTO_ABORTIFHUNG, 1000, None); // the taskbar re-reads it
-    }
 }
 
 // ---- The tray icon: shown on the taskbar, or hidden under ^ ----
@@ -214,12 +229,14 @@ pub fn tray_icon_shown(hwnd: HWND, id: u32, build: u32) -> Option<bool> {
     Some(over_tray_area(taskbar, p.x, p.y))
 }
 
-/// Windows 11 (22H2+) keeps one key per tray icon under NotifyIconSettings, found by exe path.
-/// IsPromoted = 1 means shown on the taskbar. Paths under known folders are stored as {GUID}\rest.
-fn tray_promoted() -> Option<bool> {
+const NOTIFY_ICONS: &str = r"Control Panel\NotifyIconSettings";
+
+/// Windows 11 (22H2+) keeps one key per tray icon under NotifyIconSettings: this exe's, for icon
+/// `uid`. The same exe can have several (earlier versions used another icon number). Paths under
+/// known folders are stored as {GUID}\rest. The key's name is also in Settings' id for its switch.
+pub fn tray_icon_key(uid: u32) -> Option<String> {
     let me = std::env::current_exe().ok()?.to_string_lossy().to_lowercase();
-    let base = r"Control Panel\NotifyIconSettings";
-    let b = wide(base);
+    let b = wide(NOTIFY_ICONS);
     let mut key = HKEY::default();
     if unsafe { RegOpenKeyExW(HKEY_CURRENT_USER, pcw(&b), 0, KEY_READ, &mut key) }.is_err() {
         return None;
@@ -231,10 +248,11 @@ fn tray_promoted() -> Option<bool> {
         if unsafe { RegEnumKeyExW(key, i, PWSTR(name.as_mut_ptr()), &mut len, None, PWSTR::null(), None, None) }.is_err() {
             break;
         }
-        let sub = format!(r"{base}\{}", String::from_utf16_lossy(&name[..len as usize]));
+        let k = String::from_utf16_lossy(&name[..len as usize]);
+        let sub = format!(r"{NOTIFY_ICONS}\{k}");
         let Some(path) = reg_string(HKEY_CURRENT_USER, &sub, "ExecutablePath") else { continue };
-        if expand_known_folder(&path).to_lowercase() == me {
-            found = Some(reg_dword(HKEY_CURRENT_USER, &sub, "IsPromoted").unwrap_or(0) == 1);
+        if expand_known_folder(&path).to_lowercase() == me && reg_dword(HKEY_CURRENT_USER, &sub, "UID") == Some(uid) {
+            found = Some(k);
             break;
         }
     }
@@ -242,6 +260,15 @@ fn tray_promoted() -> Option<bool> {
         let _ = RegCloseKey(key);
     }
     found
+}
+
+/// That tray icon is shown on the taskbar (IsPromoted = 1), not under ^.
+pub fn tray_key_promoted(key: &str) -> bool {
+    reg_dword(HKEY_CURRENT_USER, &format!(r"{NOTIFY_ICONS}\{key}"), "IsPromoted").unwrap_or(0) == 1
+}
+
+fn tray_promoted() -> Option<bool> {
+    tray_icon_key(crate::tray::ID).map(|k| tray_key_promoted(&k))
 }
 
 fn expand_known_folder(path: &str) -> String {
@@ -258,6 +285,15 @@ fn expand_known_folder(path: &str) -> String {
 }
 
 /// The Settings page where a hidden tray icon is turned on.
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn guid_as_the_registry_stores_it() {
+        let b = [0x78, 0x56, 0x34, 0x12, 0xBC, 0x9A, 0xF0, 0xDE, 1, 2, 3, 4, 5, 6, 7, 8];
+        assert_eq!(super::guid_from_bytes(&b), "{12345678-9ABC-DEF0-0102-030405060708}");
+    }
+}
+
 pub fn open_tray_icon_settings(build: u32) {
     if build >= 22000 {
         open("ms-settings:taskbar"); // Windows 11: Taskbar > Other system tray icons
