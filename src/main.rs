@@ -520,7 +520,13 @@ impl App {
             return; // touchpads send bursts of wheel events
         }
         self.last_step = now;
-        self.desk.slide(delta, false);
+        if win::task_view_open() {
+            // Ctrl+Win+arrow would close Task View, slide, and open it again: a flash every step.
+            // Switching through the API keeps it open and only changes the desktop it shows.
+            self.desk.go_to(self.desk.current() + delta);
+        } else {
+            self.desk.slide(delta, false);
+        }
     }
 
     // ---- Holding a window ----

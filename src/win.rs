@@ -62,6 +62,13 @@ pub fn class_name(h: HWND) -> String {
     String::from_utf16_lossy(&buf[..n.max(0) as usize])
 }
 
+/// Task View is open: it's the foreground window (its full-screen host on Windows 11, its frame on
+/// Windows 10).
+pub fn task_view_open() -> bool {
+    let fg = unsafe { windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow() };
+    matches!(class_name(fg).as_str(), "XamlExplorerHostIslandWindow" | "MultitaskingViewFrame")
+}
+
 /// A window someone would hold: visible, not minimized, not a tool window, not the taskbar or the
 /// desktop, with a title.
 pub fn is_real_window(h: HWND) -> bool {
