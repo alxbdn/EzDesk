@@ -35,7 +35,7 @@ Upload `EzDesk.msix` from the GitHub Actions artifact **EzDesk-store-msix**, bui
 
 Partner Center asks you to justify it. Paste:
 
-> EzDesk is a classic Win32 desktop app, written in Rust and open source. Full trust is required to watch window drags and mouse presses system-wide (holding a window brings up glowing bumps on the screen's sides, to slide it to another desktop), to show those bumps over other windows, to react to the mouse wheel over the taskbar, to show its notification-area icon with the current desktop number, and to call the Windows virtual desktop APIs through the open-source VirtualDesktopAccessor library. It does not access the network, user files or personal data. Source: https://github.com/alxbdn/ezdesk
+> EzDesk is a classic Win32 desktop app, written in Rust and open source. Full trust is required to watch window drags and mouse presses system-wide (holding a window brings up drops of light on the screen's edges, to slide it to another desktop), to show those drops over other windows, to react to the mouse wheel over the taskbar, to show its notification-area icon with the current desktop number and a mini-dock of desktops with live previews of their windows, and to call the Windows virtual desktop APIs through the open-source VirtualDesktopAccessor library. It does not access the network, user files or personal data. Source: https://github.com/alxbdn/ezdesk
 
 ## Store listing (English)
 
@@ -49,9 +49,10 @@ Partner Center asks you to justify it. Paste:
 
 > Windows has virtual desktops, but moving a window to another one takes a trip through Task View, and nothing tells you which desktop you're on. EzDesk makes it a mouse gesture.
 >
-> • Hold a window by its title bar for a moment: a glowing bump rises on each side of the screen. Bring the window into one and hold it there: you slide to the next or previous desktop with the window in hand. Past the last desktop, it makes a new one.
+> • Hold a window by its title bar for a moment: a drop of light clings to each edge of the screen. Bring the window to an edge and the drop grows, with the number of the desktop you'd land on next to it. Hold it there: the drop fills with white and you slide to that desktop with the window in hand. Past the last desktop, it makes a new one.
+> • Rest the mouse on the desktop number near the clock: a mini-dock shows your desktops with their wallpaper and live previews. Click one to go there, × to close it, + for a new one, drag to reorder them, right-click to rename one or choose its background.
 > • Scroll on the taskbar: previous / next desktop. Scrolling over the volume icon still changes the volume.
-> • A tray icon shows the current desktop's number, and flashes when it changes. Click it for Task View.
+> • The tray icon shows the current desktop's number in large white digits, rolling up or down when you change desktop. Click it for Task View.
 >
 > Organize your work the way you think: one desktop for meetings, one for email and the web, one for code. No shortcuts to learn.
 >
@@ -62,9 +63,10 @@ Partner Center asks you to justify it. Paste:
 **Features** (one per line in Partner Center)
 
 > Hold a window and bring it to a side of the screen to take it to the next or previous desktop
-> Glowing side bumps that swell as the window comes close
+> Drops of light on the screen edges that grow as the window comes close
+> Mini-dock on the tray number: live previews, switch, add, close, reorder and rename desktops
 > Scroll on the taskbar to step through desktops
-> Tray icon with the current desktop number
+> Tray icon with the current desktop number, large and easy to read
 > Starts with Windows (can be turned off in Settings › Apps › Startup)
 > Free, open source, no tracking
 
@@ -74,6 +76,10 @@ Partner Center asks you to justify it. Paste:
 
 **What's new in this version**
 
-> Rewritten in Rust: lighter and quicker to start. Simpler too: hold a window and bring it into the glowing bump on either side of the screen to take it to the next or previous desktop; the dock of desktops is gone. Clicking the tray number opens Task View.
+> • A mini-dock on the tray number: rest the mouse on it to see your desktops with their wallpaper and live previews. Click one to go there, × to close it, + for a new one, drag to reorder them (Windows 11 24H2+), right-click to rename one or choose its background.
+> • Drops of light on the screen edges replace the bumps: they grow as you bring a window close, show the desktop you'd land on, and fill with white before you slide there.
+> • A bigger desktop number in the tray, in white, rolling up or down when you change desktop.
+> • The menu options for the taskbar icon and for showing apps from all desktops open the right Windows Settings page.
+> • Native on Windows 11 24H2 and later. Older Windows keeps working as before.
 
 **Logo for the listing:** `brand/ezdesk-1080.png` (1:1 box art). Larger sizes come from `brand/ezdesk.svg`.
